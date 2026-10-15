@@ -23,10 +23,11 @@
   --ink-0: #d9432b; --ink-1: #c98a14; --ink-2: #7d8b2e; --ink-3: #1f8a84;
   --ink-4: #3b4fa8; --ink-5: #8a3f86; --ink-6: #c9507a; --ink-7: #5b6670;
 
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
+  /* Capacitor 8 injects --safe-area-inset-* on Android; env() covers browsers/PWA */
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
 
   --ease: cubic-bezier(.2, .8, .2, 1);
   --ts: 17px;

@@ -48,32 +48,46 @@ Studio and must need no keys, so:
 
 ## 2. Industrial design language
 
-### 2.1 The chassis
+### 2.1 The chassis — Teenage-Engineering hardware
 
-A matte-charcoal field recorder / pocket sampler. The paper "screen" is recessed into it.
+A pocket instrument, not a phone app. Two finishes (DIP switch): **ALUMINIUM** (default — brushed warm-grey
+anodised panel, white/colour rubber keys) and **CHARCOAL**. The paper "screen" sits in a black glass window.
 
-* **Top bezel** (≈ 64 dp): `RACK` reel button · label-maker **title tape** · **rotary dial**.
-  Silkscreened nameplate `PORTASCRIBE MK-I` (tap → DIP-switch settings).
-* **Bottom bezel**: context keys (rubber keycaps with silkscreen legends and LEDs).
-* **Screws, vents, tolerance lines** — used sparingly as texture, never as content.
-* One accent: **signal orange** `#ff5b1f`. LEDs: green (safe/saved), red (recording), amber (latch / warning).
+* **Top bezel**: silkscreen nameplate `PORTASCRIBE [MK-I]` + speaker grille + gear (tap → DIP switches);
+  `RACK` reel button · **label-maker tape** (song title, ink-colour swatch) over an **amber OLED readout**
+  (dot-matrix, context-sensitive: lines/words/sprint clock · strip count/tool · arrangement `V1 C V2 C` + BPM/key)
+  · **rotary dial** (orange cap) with silkscreen legend `ROLL / FREEWRITE`, `TABLE / CUT-UP`, `BENCH / STRUCTURE`.
+* **Bottom keys**: chunky colour-coded rubber keys (yellow, blue, orange, green, ink, white) with printed line icons,
+  bracketed silkscreen legends and a little LED above toggles. Pressed keys physically sink.
+* Screws in the corners; brushed-metal grain; hairline seams. One accent: **signal orange** `#ff5b1f`.
+* Panels that slide over the device (sheets, rack, trays, toast) use a dark **OLED** treatment.
+
+### 2.1b Three writing surfaces, three physical objects
+
+| Mode | Object | Details |
+|---|---|---|
+| ROLL | **spiral-bound tear-off pad** | coil binding + perforation, ruled paper, red margin; latch/grease tint the binding edge |
+| TABLE | **cork board** | sticky notes (4 colours) held by pushpins or washi tape, taped splices, brushed-metal deal lever |
+| BENCH | **ruled index cards** | red header rule, blue lines, coloured kind-tab on top, stacked-edge shadow when a section has several takes, masking-tape deck strip |
 
 ### 2.2 Paper stocks (themes)
 
-| Stock | Feel | Use |
-|---|---|---|
-| **NEWSPRINT** (default) | warm greige, fibres, ink-black | day |
-| **GRAPH** | cool bone with faint blue grid | analytic / lyric-as-math people |
-| **MIDNIGHT** | warm dark paper, cream ink | night, stage |
+| Stock | Feel |
+|---|---|
+| **NEWSPRINT** (default) | warm greige, fibres, ink-black |
+| **LEGAL** | yellow legal-pad, blue rules, red margin |
+| **GRAPH** | cool bone with faint blue grid |
+| **MIDNIGHT** | warm dark paper, cream ink |
 
-The chassis is always charcoal. Each song also has an **ink colour** (8 marker colours) that tints
-its tape spine, cover, LED glow and chord stamps — the "mood" of the song in one swatch.
+Each song also has an **ink colour** (8 marker colours) used for its cassette spine, label swatch, cover card and kind tags.
 
 ### 2.3 Type
 
 | Role | Face | Why |
 |---|---|---|
-| Silkscreen / UI | **Space Mono** (caps, wide tracking) | technical, instrument-panel |
+| Silkscreen / labels | **Barlow Condensed** (caps, tracked) | Teenage-Engineering-style panel print |
+| Data / UI numerals | **Space Mono** | technical |
+| OLED readout | **Doto** (dot-matrix) | the little display |
 | Lyrics (Bench, Roll) | **Courier Prime** | typewriter warmth; *monospace is required* so chord stamps can sit exactly above a character |
 | Display (headers, stamps) | **Special Elite** | worn typewriter |
 | Handwriting (strips, slips, tape labels) | **Caveat** | felt-pen scrawl |
@@ -266,3 +280,20 @@ Stores: `songs`, `scraps`, `blobs`, `kv` (settings, API cache). Writes are debou
 * [ ] Export text / ChordPro / backup JSON; import backup.
 * [ ] Back button closes overlays before leaving the app.
 * [ ] Debug APK installs and launches.
+
+---
+
+## 11. Build status (v0.1.0)
+
+Implemented: everything in §4 except items below. Verified with 22 unit tests (engine) and a Playwright
+interaction suite (`scripts/e2e/flows.mjs`: typing, latch/ghost ink, grease → punch → table, strip drag/snip/lever,
+slot-to-bench, line split/merge, chord drag, swipe-to-boneyard, wheel → rhyme → swap word, rack, slip, settings).
+
+Known gaps / next:
+* Voice-memo audio is stored on-device but **not included in JSON backups** yet.
+* Debug APK only (signed with the Android debug key); no Play Store release signing yet.
+* Not yet exercised on a physical device in this session (no emulator available) — the APK is structurally verified
+  (manifest, permissions, signature, bundled assets). First on-device pass should check IME behaviour for the Roll's
+  latch (Gboard composition) and microphone permission flow.
+* Section reorder uses ◀ ▶ on the song map rather than free dragging.
+* Roadmap: cloud sync, Android share-into-Portascribe intent, home-screen quick-catch widget, collaborative writing.

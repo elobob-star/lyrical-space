@@ -45,14 +45,22 @@ export function App() {
         void CapApp.minimizeApp();
       });
       off = () => void h.remove();
-      try {
-        const { StatusBar, Style } = await import('@capacitor/status-bar');
-        await StatusBar.setStyle({ style: Style.Dark });
-        await StatusBar.setBackgroundColor({ color: '#17181b' });
-      } catch { /* status bar plugin optional */ }
     });
     return () => { off?.(); vv?.removeEventListener('resize', sync); window.removeEventListener('resize', sync); };
   }, []);
+
+  // status-bar icon contrast follows the chassis finish (dark icons on aluminium)
+  const finish = settings.value.chassis;
+  useEffect(() => {
+    void import('@capacitor/core').then(async ({ Capacitor }) => {
+      if (!Capacitor.isNativePlatform()) return;
+      try {
+        const { StatusBar, Style } = await import('@capacitor/status-bar');
+        await StatusBar.setStyle({ style: finish === 'alu' ? Style.Light : Style.Dark });
+      } catch { /* optional */ }
+    });
+    document.querySelector('meta[name=theme-color]')?.setAttribute('content', finish === 'alu' ? '#e6e4de' : '#1f2125');
+  }, [finish]);
 
   // wake lock
   const awake = settings.value.awake;

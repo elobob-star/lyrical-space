@@ -4,10 +4,11 @@ const config: CapacitorConfig = {
   appId: 'dev.portascribe.mk1',
   appName: 'Portascribe',
   webDir: 'dist',
-  backgroundColor: '#16171a',
+  backgroundColor: '#d9d7d0',
   android: { allowMixedContent: false },
   plugins: {
-    SplashScreen: { launchShowDuration: 0, backgroundColor: '#16171a' },
+    SplashScreen: { launchShowDuration: 0, backgroundColor: '#d9d7d0' },
+    SystemBars: { insetsHandling: 'css' },
   },
 };
 
