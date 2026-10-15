@@ -94,10 +94,10 @@ export function Bezel() {
     </button>
   );
   const tape = (
-    <button class="title-tape" onClick={() => { if (!editing) { setEditing(true); setTimeout(() => inp.current?.select(), 30); } }} aria-label="Song title">
+    <button class="title-tape" onClick={() => { if (!editing) { setEditing(true); } }} aria-label="Song title">
       <span class="swatch" style={{ '--c': `var(--ink-${song?.ink ?? 0})` }} />
       {editing ? (
-        <input ref={inp} defaultValue={song?.title ?? ''} maxLength={60} onBlur={finish}
+        <input ref={(el) => { inp.current = el; if (el && document.activeElement !== el) { el.focus(); el.select(); } }} defaultValue={song?.title ?? ''} maxLength={60} onBlur={finish}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
       ) : (
         <><span class="t">{song?.title ?? '—'}</span><Icon n="edit" size={12} class="edit" /></>
