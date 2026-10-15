@@ -1,0 +1,283 @@
+import { signal } from '@preact/signals';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { addScrap, currentSong, removeScrap, scraps, updateCurrent, updateScrap } from '../store/state';
+import { ID, Strip, sectionNames, uid } from '../store/models';
+import { feel, haptic, sound } from '../engine/feel';
+import { freeSpot, makeStrips, sendTextToBench } from '../store/actions';
+import { indexAtPoint } from '../engine/hit';
+import { say } from '../store/ui';
+import { Key, Keys } from './Key';
+import { Icon } from './icons';
+import { Choices, Sheet, TextSheet } from './Sheet';
+import { setMode } from './Bezel';
+
+type Tool = null | 'snip' | 'tape';
+export const tableTool = signal<Tool>(null);
+const selected = signal<ID | null>(null);
+const taped = signal<ID | null>(null);
+const sheetState = signal<null | { kind: 'edit' | 'new'; id?: ID } | { kind: 'bench'; id: ID } | { kind: 'join'; a: ID; b: ID }>(null);
+
+function stripRemove(id: ID): Strip | null {
+  const s = currentSong.value?.table.find((x) => x.id === id) ?? null;
+  updateCurrent((d) => { d.table = d.table.filter((x) => x.id !== id); });
+  if (selected.value === id) selected.value = null;
+  return s;
+}
+
+function restoreStrip(s: Strip) { updateCurrent((d) => { d.table.push(s); }); }
+
+export function dealFromScraps(): number {
+  const song = currentSong.value;
+  if (!song) return 0;
+  const sparks = scraps.value.filter((s) => s.kind === 'spark');
+  const bones = scraps.value.filter((s) => s.kind === 'bone');
+  const pool = [...sparks.sort(() => Math.random() - 0.5), ...bones.sort(() => Math.random() - 0.5)].slice(0, 4);
+  if (!pool.length) return 0;
+  pool.forEach((p) => updateScrap(p.id, { used: p.used + 1 }));
+  updateCurrent((d) => { d.table.push(...makeStrips(pool.map((p) => p.text), 'spark', d.table)); });
+  return pool.length;
+}
+
+export function TableView() {
+  const song = currentSong.value!;
+  const board = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 360, h: 600 });
+  const [drag, setDragState] = useState<null | { id: ID; x: number; y: number }>(null);
+  const dragRef = useRef<typeof drag>(null);
+  const setDrag = (v: typeof drag) => { dragRef.current = v; setDragState(v); };
+  const [lever, setLever] = useState(0);
+  const sheet = sheetState.value;
+  const sel = selected.value;
+
+  useEffect(() => {
+    const el = board.current!;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    setSize({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => () => { selected.value = null; taped.value = null; tableTool.value = null; }, []);
+
+  const tool = tableTool.value;
+
+  // ---- strip pointer handling ----
+  const info = useRef<{ id: ID; px: number; py: number; ox: number; oy: number; moved: boolean; t: number } | null>(null);
+  const onDown = (e: PointerEvent, s: Strip) => {
+    if (tool === 'snip') return; // handled on click
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    info.current = { id: s.id, px: e.clientX, py: e.clientY, ox: s.x, oy: s.y, moved: false, t: Date.now() };
+  };
+  const onMove = (e: PointerEvent) => {
+    const d = info.current;
+    if (!d) return;
+    const dx = e.clientX - d.px, dy = e.clientY - d.py;
+    if (!d.moved && Math.hypot(dx, dy) < 6) return;
+    if (!d.moved) { d.moved = true; haptic('light'); selected.value = null; }
+    setDrag({ id: d.id, x: Math.max(-0.08, Math.min(0.9, d.ox + dx / size.w)), y: Math.max(0, Math.min(0.94, d.oy + dy / size.h)) });
+  };
+  const onUp = (e: PointerEvent, s: Strip) => {
+    const d = info.current;
+    info.current = null;
+    if (!d) return;
+    if (d.moved) {
+      const cur = dragRef.current;
+      if (cur) {
+        updateCurrent((song2) => {
+          const z = Math.max(0, ...song2.table.map((x) => x.z)) + 1;
+          const t = song2.table.find((x) => x.id === d.id);
+          if (t) { t.x = cur.x; t.y = cur.y; t.z = z; }
+        });
+      }
+      setDrag(null);
+      sound('thock');
+      return;
+    }
+    // tap
+    if (tool === 'tape') {
+      if (!taped.value) { taped.value = s.id; feel('click'); }
+      else if (taped.value === s.id) { taped.value = null; }
+      else { sheetState.value = { kind: 'join', a: taped.value, b: s.id }; }
+      return;
+    }
+    feel('click');
+    selected.value = selected.value === s.id ? null : s.id;
+    updateCurrent((d2) => { const t = d2.table.find((x) => x.id === s.id); if (t) t.z = Math.max(0, ...d2.table.map((x) => x.z)) + 1; });
+  };
+  const onClickSnip = (e: MouseEvent, s: Strip) => {
+    if (tool !== 'snip') return;
+    const el = e.currentTarget as HTMLElement;
+    const off = indexAtPoint(el, e.clientX, e.clientY, s.text.length);
+    const txt = s.text;
+    // snap to the nearest whitespace
+    let l = off, rr = off;
+    while (l > 0 && !/\s/.test(txt[l - 1])) l--;
+    while (rr < txt.length && !/\s/.test(txt[rr])) rr++;
+    const cut = off - l <= rr - off ? l : rr;
+    const a = txt.slice(0, cut).trim(), b = txt.slice(cut).trim();
+    if (!a || !b) { say('TAP BETWEEN WORDS TO CUT'); return; }
+    feel('snip', 'medium');
+    updateCurrent((d) => {
+      const t = d.table.find((x) => x.id === s.id)!;
+      t.text = a;
+      const z = Math.max(0, ...d.table.map((x) => x.z));
+      d.table.push({ id: uid(), text: b, x: Math.min(0.85, t.x + 0.05), y: Math.min(0.9, t.y + 0.11), rot: (Math.random() - 0.5) * 8, z: z + 1, from: t.from });
+    });
+  };
+
+  // ---- lever ----
+  const lv = useRef<{ y: number; active: boolean } | null>(null);
+  const LEVER_H = 150;
+  const lvDown = (e: PointerEvent) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); lv.current = { y: e.clientY, active: true }; };
+  const lvMove = (e: PointerEvent) => {
+    if (!lv.current?.active) return;
+    const p = Math.max(0, Math.min(1, (e.clientY - lv.current.y) / LEVER_H));
+    setLever((prev) => { if (Math.floor(p * 6) !== Math.floor(prev * 6)) sound('tock'); return p; });
+  };
+  const lvUp = () => {
+    if (!lv.current?.active) return;
+    lv.current = null;
+    setLever((p) => {
+      if (p > 0.8) {
+        feel('ratchet', 'heavy');
+        const n = dealFromScraps();
+        say(n ? `DEALT ${n} FRAGMENTS` : 'SHOEBOX & BONEYARD ARE EMPTY — CATCH SOME LINES');
+      }
+      return 0;
+    });
+  };
+
+  const strips = [...song.table].sort((a, b) => a.z - b.z);
+  const selStrip = strips.find((s) => s.id === sel);
+  const joinInfo = sheet?.kind === 'join' ? sheet : null;
+
+  return (
+    <div class="mode-view table">
+      <div class="board" ref={board} onClick={(e) => { if (e.target === e.currentTarget) selected.value = null; }}>
+        <div class="board-label">{tool === 'snip' ? 'SNIP — TAP BETWEEN WORDS' : tool === 'tape' ? (taped.value ? 'TAPE — PICK THE SECOND STRIP' : 'TAPE — PICK THE FIRST STRIP') : `${strips.length} STRIP${strips.length === 1 ? '' : 'S'} ON THE TABLE`}</div>
+        {strips.length === 0 && (
+          <div class="empty-table">
+            <b>EMPTY TABLE</b>
+            <span>Punch highlights from the ROLL, pull the lever for random fragments, or add a strip.</span>
+          </div>
+        )}
+        {strips.map((s) => {
+          const d = drag?.id === s.id ? drag : null;
+          const x = d ? d.x : s.x, y = d ? d.y : s.y;
+          return (
+            <div key={s.id}
+              class={'strip' + (sel === s.id ? ' sel' : '') + (taped.value === s.id ? ' taped' : '') + (d ? ' dragging' : '') + (tool === 'snip' ? ' snippable' : '') + (s.from === 'splice' ? ' spliced' : '')}
+              style={{ left: `${x * 100}%`, top: `${y * 100}%`, zIndex: d ? 999 : s.z, transform: `rotate(${s.rot}deg)${d ? ' scale(1.04)' : ''}` }}
+              onPointerDown={(e) => onDown(e as any, s)} onPointerMove={onMove as any} onPointerUp={(e) => onUp(e as any, s)} onPointerCancel={() => { info.current = null; setDrag(null); }}
+              onClick={(e) => onClickSnip(e as any, s)}>
+              <span class="st" data-s="0">{s.text}</span>
+            </div>
+          );
+        })}
+        {selStrip && !drag && (
+          <div class="strip-actions" style={{
+            left: `${Math.max(2, Math.min(70, selStrip.x * 100))}%`,
+            top: selStrip.y > 0.14 ? `calc(${selStrip.y * 100}% - 46px)` : `calc(${selStrip.y * 100}% + 70px)`, zIndex: 1000,
+          }}>
+            <button onClick={() => { sheetState.value = { kind: 'edit', id: selStrip.id }; }}><Icon n="edit" size={15} />EDIT</button>
+            <button class="go" onClick={() => { sheetState.value = { kind: 'bench', id: selStrip.id }; }}><Icon n="bench" size={15} />BENCH</button>
+            <button onClick={() => {
+              const s = stripRemove(selStrip.id);
+              if (!s) return;
+              const sc = addScrap(s.text, 'bone', song.id);
+              feel('thock');
+              say('BURIED IN THE BONEYARD', { label: 'UNDO', run: () => { restoreStrip(s); if (sc) removeScrap(sc.id); } });
+            }}><Icon n="bones" size={15} />BURY</button>
+            <button class="danger" aria-label="Delete strip" onClick={() => {
+              const s = stripRemove(selStrip.id);
+              if (s) say('STRIP REMOVED', { label: 'UNDO', run: () => restoreStrip(s) });
+            }}><Icon n="trash" size={15} /></button>
+          </div>
+        )}
+        <div class="lever-slot" aria-label="Deal lever">
+          <span class="lever-label">DEAL</span>
+          <div class="lever-track" />
+          <div class="lever-knob" style={{ transform: `translateY(${lever * LEVER_H}px)` }}
+            onPointerDown={lvDown as any} onPointerMove={lvMove as any} onPointerUp={lvUp} onPointerCancel={lvUp} />
+        </div>
+      </div>
+
+      {sheet?.kind === 'new' && (
+        <TextSheet title="NEW STRIP" multiline hand placeholder="a line, a fragment, a word…" okLabel="PIN IT"
+          onClose={() => (sheetState.value = null)}
+          onSave={(v) => { const t = v.trim(); if (t) updateCurrent((d) => { d.table.push(...makeStrips([t], 'typed', d.table)); }); }} />
+      )}
+      {sheet?.kind === 'edit' && (
+        <TextSheet title="EDIT STRIP" multiline hand value={song.table.find((s) => s.id === sheet.id)?.text ?? ''}
+          onClose={() => (sheetState.value = null)}
+          onSave={(v) => updateCurrent((d) => { const t = d.table.find((s) => s.id === sheet.id); if (t) t.text = v.trim() || t.text; })} />
+      )}
+      {sheet?.kind === 'bench' && <BenchChooser id={sheet.id} />}
+      {joinInfo && (
+        <Sheet title="TAPE THEM TOGETHER" onClose={() => { sheetState.value = null; taped.value = null; }}>
+          <Choices items={[{ id: 'stack', label: 'STACK ↓', hint: 'two lines, one strip' }, { id: 'join', label: 'JOIN →', hint: 'one line, glued with a space' }]}
+            onPick={(k) => {
+              updateCurrent((d) => {
+                const a = d.table.find((s) => s.id === joinInfo.a), b = d.table.find((s) => s.id === joinInfo.b);
+                if (!a || !b) return;
+                a.text = a.text + (k === 'stack' ? '\n' : ' ') + b.text;
+                a.from = 'splice';
+                a.z = Math.max(0, ...d.table.map((x) => x.z)) + 1;
+                d.table = d.table.filter((s) => s.id !== b.id);
+              });
+              feel('chk', 'medium');
+              sheetState.value = null; taped.value = null;
+            }} />
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+function BenchChooser({ id }: { id: ID }) {
+  const song = currentSong.value!;
+  const strip = song.table.find((s) => s.id === id);
+  const names = sectionNames(song);
+  const close = () => (sheetState.value = null);
+  if (!strip) return null;
+  const go = (target: ID | 'new', kind?: any) => {
+    const sid = sendTextToBench(song.id, [strip.text], target, kind);
+    const removed = stripRemove(id);
+    feel('thock', 'medium');
+    close();
+    say(`SLOTTED INTO ${names.get(sid)?.toUpperCase() ?? (kind ?? 'verse').toUpperCase()}`, { label: 'GO TO BENCH', run: () => setMode('bench') });
+    void removed;
+  };
+  return (
+    <Sheet title="SLOT INTO THE BENCH" onClose={close}>
+      <Choices
+        items={[
+          ...song.sections.map((s) => ({ id: s.id, label: names.get(s.id) ?? s.kind.toUpperCase(), hint: 'append' })),
+          { id: 'new:verse', label: '+ NEW VERSE', hint: '' }, { id: 'new:chorus', label: '+ NEW CHORUS', hint: '' }, { id: 'new:bridge', label: '+ NEW BRIDGE', hint: '' },
+        ]}
+        onPick={(v) => (v.startsWith('new:') ? go('new', v.slice(4)) : go(v as ID))} />
+    </Sheet>
+  );
+}
+
+export function TableKeys() {
+  const tool = tableTool.value;
+  return (
+    <Keys>
+      <Key icon="strip" label="+Strip" sound="thock" onClick={() => (sheetState.value = { kind: 'new' })} />
+      <Key icon="scissors" label="Snip" on={tool === 'snip'} led="orange" onClick={() => { tableTool.value = tool === 'snip' ? null : 'snip'; taped.value = null; selected.value = null; }} />
+      <Key icon="tape" label="Tape" on={tool === 'tape'} led="orange" onClick={() => { tableTool.value = tool === 'tape' ? null : 'tape'; taped.value = null; selected.value = null; }} />
+      <Key icon="shuffle" label="Shuffle" sound="ratchet" onClick={() => {
+        updateCurrent((d) => {
+          const out: Strip[] = [];
+          for (const s of d.table) {
+            const p = freeSpot(out);
+            out.push({ ...s, x: p.x, y: p.y, rot: (Math.random() - 0.5) * 6 });
+          }
+          d.table = out;
+        });
+        selected.value = null;
+      }} />
+    </Keys>
+  );
+}

@@ -1,0 +1,57 @@
+import { JSX } from 'preact';
+
+const P: Record<string, JSX.Element> = {
+  reel: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.2" /><path d="M12 3v4.5M12 16.5V21M3 12h4.5M16.5 12H21M5.6 5.6l3.2 3.2M15.2 15.2l3.2 3.2M18.4 5.6l-3.2 3.2M8.8 15.2l-3.2 3.2" /></>,
+  latch: <><rect x="4" y="10" width="16" height="9" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><path d="M12 13.5v2.5" /></>,
+  grease: <><path d="M4 20l3-.8L19 7.2a2.1 2.1 0 0 0-3-3L4 16.2z" /><path d="M14 6l4 4" /></>,
+  spark: <><path d="M13 2L5 13.5h6L10 22l9-12h-6.2z" /></>,
+  punch: <><circle cx="8" cy="8" r="2.6" /><circle cx="16" cy="8" r="2.6" /><circle cx="12" cy="16" r="2.6" /><path d="M4 21h16" /></>,
+  strip: <><rect x="3" y="7" width="18" height="10" rx="1" transform="rotate(-4 12 12)" /><path d="M12 10v4M10 12h4" /></>,
+  scissors: <><circle cx="6" cy="6" r="2.6" /><circle cx="6" cy="18" r="2.6" /><path d="M8 7.6L20 17M8 16.4L20 7" /></>,
+  tape: <><rect x="3" y="8" width="18" height="8" rx="1.2" /><path d="M8 8v8M16 8v8" strokeDasharray="1.5 1.8" /></>,
+  shuffle: <><path d="M3 7h3.5c4 0 5 10 9.5 10H21M3 17h3.5c1.6 0 2.7-1.4 3.6-3.1M13.5 9.2C14.3 8 15.2 7 16.5 7H21" /><path d="M18.5 4.5L21 7l-2.5 2.5M18.5 14.5L21 17l-2.5 2.5" /></>,
+  wheel: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.4" /><path d="M12 3v6.6M12 14.4V21M4.2 7.5l5.7 3.3M14.1 13.2l5.7 3.3M19.8 7.5l-5.7 3.3M9.9 13.2l-5.7 3.3" /></>,
+  chord: <><rect x="5" y="5" width="14" height="14" rx="3" /><path d="M9 15V9l3 4 3-4v6" /></>,
+  flow: <><path d="M3 8c3-4 6 4 9 0s6 4 9 0M3 16c3-4 6 4 9 0s6 4 9 0" /></>,
+  bones: <><path d="M6.5 5.5a2 2 0 0 0-3 2.7 2 2 0 0 0 2.2 3.1L13 18.6a2 2 0 0 0 3.1 2.2 2 2 0 0 0 2.7-3 2 2 0 0 0-2.2-3.1L9.2 7.7a2 2 0 0 0-2.7-2.2z" /></>,
+  export: <><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5" /><path d="M5 12v7h14v-7" /></>,
+  rec: <><circle cx="12" cy="12" r="6" fill="currentColor" /></>,
+  play: <><path d="M8 5l11 7-11 7z" fill="currentColor" /></>,
+  stop: <><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" /></>,
+  loop: <><path d="M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4" /></>,
+  metro: <><path d="M8 21h8l-2.5-16h-3z" /><path d="M12 17l4-8" /><circle cx="16" cy="9" r="1" fill="currentColor" /></>,
+  close: <><path d="M6 6l12 12M18 6L6 18" /></>,
+  plus: <><path d="M12 5v14M5 12h14" /></>,
+  trash: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></>,
+  undo: <><path d="M9 14L4 9l5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></>,
+  search: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l5 5" /></>,
+  gear: <><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" /></>,
+  note: <><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /><circle cx="16.5" cy="16" r="2.5" /></>,
+  left: <><path d="M15 5l-7 7 7 7" /></>,
+  right: <><path d="M9 5l7 7-7 7" /></>,
+  down: <><path d="M5 9l7 7 7-7" /></>,
+  up: <><path d="M5 15l7-7 7 7" /></>,
+  repeat: <><path d="M17 2l3 3-3 3M4 12V10a3 3 0 0 1 3-3h13M7 22l-3-3 3-3M20 14v2a3 3 0 0 1-3 3H4" /></>,
+  copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>,
+  edit: <><path d="M4 20h4L19 9l-4-4L4 16z" /></>,
+  bench: <><path d="M4 9h16M6 9v10M18 9v10M3 9l1-4h16l1 4" /></>,
+  send: <><path d="M4 12l16-8-6 16-3-7z" /></>,
+  moon: <><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" /></>,
+  eye: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
+  mic: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>,
+  card: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
+  link: <><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></>,
+  check: <><path d="M5 12.5l4.5 4.5L19 7" /></>,
+  up2: <><path d="M12 19V5M6 11l6-6 6 6" /></>,
+  down2: <><path d="M12 5v14M6 13l6 6 6-6" /></>,
+  box: <><path d="M3 8l9-4 9 4v10l-9 4-9-4z" /><path d="M3 8l9 4 9-4M12 12v10" /></>,
+};
+
+export function Icon({ n, size = 20, class: cls }: { n: keyof typeof P | string; size?: number; class?: string }) {
+  return (
+    <svg class={'ic ' + (cls ?? '')} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {P[n] ?? null}
+    </svg>
+  );
+}
