@@ -27,7 +27,7 @@
 .roll-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; position: relative; scrollbar-width: none; }
 .roll-scroll::-webkit-scrollbar { display: none; }
 .roll-sheet {
-  position: relative; min-height: 100%; --pad-top: 6px;
+  position: relative; min-height: var(--roll-h, 100%); --pad-top: 6px;
   background-image:
     linear-gradient(90deg, transparent 22px, var(--rule-strong) 22px 23px, transparent 23px),
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--rule) calc(var(--lh) - 1px), var(--rule) var(--lh));
@@ -38,8 +38,8 @@
   font: 400 var(--ts)/var(--lh) var(--font-type); padding: 12px 18px 160px 30px; margin: 0; width: 100%; border: 0; letter-spacing: 0;
   white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
 }
-.roll-mirror { position: absolute; left: 0; right: 0; top: 0; min-height: 100%; color: var(--ink); pointer-events: none; }
-.roll-input { position: relative; display: block; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--orange); resize: none; outline: 0; overflow: hidden; border-radius: 0; }
+.roll-mirror { position: relative; min-height: var(--roll-h, 100%); color: var(--ink); pointer-events: none; }
+.roll-input { position: absolute; inset: 0; height: 100%; display: block; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--orange); resize: none; outline: 0; overflow: hidden; border-radius: 0; }
 .roll-input::selection { background: rgba(255, 91, 31, .3); -webkit-text-fill-color: transparent; }
 .roll-mirror .ph { color: var(--ink-faint); font-style: italic; }
 .roll-mirror .g { text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: var(--ink-2); opacity: .36; }
@@ -66,9 +66,10 @@
 .strip {
   position: absolute; max-width: 72%; padding: 10px 14px 11px; background: var(--strip); color: var(--strip-ink); border-radius: 2px;
   font: 600 22px/1.08 var(--font-hand); box-shadow: 0 1px 0 rgba(0, 0, 0, .1), 0 5px 10px var(--shadow); cursor: grab; touch-action: none; user-select: none;
-  transition: left .5s var(--ease), top .5s var(--ease), box-shadow .15s, transform .15s; white-space: pre-line; word-break: break-word;
+  white-space: pre-line; animation: stripin .5s var(--spring-soft) backwards; word-break: break-word;
 }
-.strip.dragging { transition: none; box-shadow: 0 16px 24px var(--shadow); cursor: grabbing; }
+.strip.dragging { z-index: 999 !important; cursor: grabbing; will-change: transform; filter: drop-shadow(0 16px 14px rgba(40, 20, 0, .45)); }
+@keyframes stripin { from { transform: translate3d(0, -26px, 0) rotate(calc(var(--r, 0) * 1deg)) scale(.92); opacity: 0; } }
 .strip.sel { outline: 2px solid var(--orange); outline-offset: 2px; }
 .strip.taped { outline: 2px dashed var(--orange); outline-offset: 3px; }
 .strip.snippable { cursor: crosshair; }
@@ -385,3 +386,82 @@ button:disabled { cursor: default; }
 .card-head { padding-top: 11px; border-bottom: 2px solid var(--card-red); margin: 0 0 0 0; }
 .line { border-bottom: 1px solid var(--card-rule); }
 .line-wrap:last-child .line { border-bottom: 0; }
+
+/* ======================================================================
+   DEPTH PASS — light from top-left; elevation via layered shadows
+   ====================================================================== */
+
+/* ---- Roll: pad curvature, coil casting a shadow on the page ---- */
+.roll::after { content: ''; position: absolute; inset: 30px 0 0 0; pointer-events: none; z-index: 5;
+  background: linear-gradient(90deg, rgba(0, 0, 0, .13), rgba(0, 0, 0, 0) 7%, rgba(0, 0, 0, 0) 90%, rgba(0, 0, 0, .12)),
+              linear-gradient(180deg, rgba(0, 0, 0, .0) 90%, rgba(0, 0, 0, .1)); }
+.coil { z-index: 6; box-shadow: 0 1px 0 rgba(255, 255, 255, .35) inset; }
+.coil::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 16px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .28), rgba(0, 0, 0, .08) 45%, rgba(0, 0, 0, 0)); }
+.roll.latched .coil { box-shadow: 0 2px 0 var(--led-amber), 0 1px 0 rgba(255, 255, 255, .35) inset; }
+.roll.grease .coil { box-shadow: 0 2px 0 var(--led-yellow), 0 1px 0 rgba(255, 255, 255, .35) inset; }
+.spark-slip { box-shadow: var(--e2); }
+
+/* ---- Table: curled sticky notes, domed pins ---- */
+.strip { box-shadow: 0 1px 0 rgba(0, 0, 0, .1), 1px 3px 3px rgba(40, 20, 0, .3), 3px 10px 14px rgba(40, 20, 0, .34);
+  background-image: linear-gradient(172deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, .06)); }
+.strip:not(.spliced)::before { content: ''; position: absolute; right: 0; bottom: 0; width: 24px; height: 24px; pointer-events: none;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0) 46%, rgba(0, 0, 0, .16) 50%, rgba(255, 255, 255, .55) 54%, rgba(255, 255, 255, .25) 100%);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+.strip::after { width: 16px; height: 16px; margin-left: -8px; top: -6px;
+  background: radial-gradient(circle at 33% 27%, rgba(255, 255, 255, .95) 0 9%, rgba(255, 255, 255, 0) 34%), radial-gradient(circle at 50% 62%, var(--pin, #e23d3d) 30%, rgba(0, 0, 0, .35) 100%), var(--pin, #e23d3d);
+  box-shadow: 3px 6px 3px rgba(0, 0, 0, .45), inset -2px -3px 3px rgba(0, 0, 0, .3), inset 1px 1px 2px rgba(255, 255, 255, .45); }
+.strip.f-spark::after { width: 58px; height: 18px; margin-left: -29px; top: -9px; box-shadow: 0 2px 3px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .5); }
+.strip.sel { outline: 0; box-shadow: 0 0 0 2.5px var(--orange), 0 0 14px 2px rgba(255, 91, 31, .5), 3px 10px 14px rgba(40, 20, 0, .34); }
+.board::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 3; box-shadow: inset 0 0 70px rgba(50, 25, 5, .55), inset 0 0 0 5px rgba(120, 78, 36, .5); }
+.lever-slot { background: linear-gradient(90deg, #f7f6f2, #bdbab0 24%, #f1f0ea 48%, #a8a59b 74%, #e9e7e0); box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .9), 0 6px 10px rgba(0, 0, 0, .5), 1px 2px 0 rgba(255, 255, 255, .2); }
+.lever-track { background: linear-gradient(90deg, #050506, #1d1e21 50%, #050506); box-shadow: inset 0 3px 5px #000, 0 1px 0 rgba(255, 255, 255, .6); }
+.lever-knob { background: radial-gradient(circle at 34% 24%, #ffc3a3, #ff5b1f 44%, #c43a08 100%); width: 32px; height: 32px; margin-left: -16px; will-change: transform;
+  box-shadow: 0 6px 8px rgba(0, 0, 0, .55), inset 0 2px 2px rgba(255, 255, 255, .6), inset 0 -4px 5px rgba(0, 0, 0, .3); transition: transform .55s var(--spring-snap); }
+.lever-knob.drag { transition: none; }
+
+/* ---- Bench: thicker cards, chrome stamps, 3D take flip ---- */
+.card { background-image: linear-gradient(180deg, rgba(255, 255, 255, .4), rgba(255, 255, 255, 0) 30%, rgba(0, 0, 0, .025)); box-shadow: 0 1px 0 rgba(0, 0, 0, .14), 0 3px 2px rgba(0, 0, 0, .1), 0 12px 18px -4px var(--shadow); }
+.card.stack-1 { box-shadow: 0 1px 0 rgba(0, 0, 0, .1), 4px 5px 0 -1px var(--card-2), 4px 6px 0 -1px rgba(0, 0, 0, .18), 0 14px 18px -4px var(--shadow); }
+.card.stack-2 { box-shadow: 0 1px 0 rgba(0, 0, 0, .1), 4px 5px 0 -1px var(--card-2), 4px 6px 0 -1px rgba(0, 0, 0, .18), 8px 10px 0 -2px var(--card-2), 8px 11px 0 -2px rgba(0, 0, 0, .14), 0 18px 22px -4px var(--shadow); }
+.stamp, .tstamp { background: linear-gradient(180deg, #fdfdfc 0, #e6e6e3 40%, #b5b5b1 50%, #d9d9d5 62%, #a4a49f 100%); border-radius: 5px;
+  box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0, 0, 0, .25), 0 0 0 1px rgba(0, 0, 0, .28), 0 3px 3px rgba(0, 0, 0, .35); text-shadow: 0 1px 0 rgba(255, 255, 255, .8); }
+.stamp { transform: rotate(-1.5deg) translate3d(0, 0, 0); }
+.tstamp { box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0, 0, 0, .25), 0 0 0 1px rgba(0, 0, 0, .35), 0 4px 0 #6a6a66, 0 7px 8px rgba(0, 0, 0, .45); transition: transform .3s var(--spring-snap); }
+.tstamp:active { transform: translate3d(0, 3px, 0); transition: transform .05s; }
+.lines { perspective: 900px; }
+.lines.dir-l { animation: flipL .42s var(--spring-soft); transform-origin: 0 50%; }
+.lines.dir-r { animation: flipR .42s var(--spring-soft); transform-origin: 100% 50%; }
+@keyframes flipL { from { transform: rotateY(-62deg) translate3d(24px, 0, 0); opacity: 0; } }
+@keyframes flipR { from { transform: rotateY(62deg) translate3d(-24px, 0, 0); opacity: 0; } }
+.mblock { background: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, .14)), var(--kc); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 3px 0 rgba(0, 0, 0, .4), 0 5px 5px rgba(0, 0, 0, .25); transition: transform .3s var(--spring-snap); }
+.mblock:active { transform: translate3d(0, 3px, 0); transition: transform .05s; }
+.mblock.sel { transform: translate3d(0, -3px, 0); }
+.deck { box-shadow: 0 2px 2px rgba(0, 0, 0, .12), 0 6px 10px var(--shadow); }
+
+/* ---- shared controls & panels ---- */
+.btn, .tog, .cell, .kind, .li, .choice, .mod, .tile, .seg button { will-change: auto; }
+.btn { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), inset 0 -2px 0 rgba(0, 0, 0, .35), 0 0 0 1px rgba(0, 0, 0, .5), 0 3px 0 #08080a, 0 6px 8px rgba(0, 0, 0, .45); transition: transform .3s var(--spring-snap); }
+.btn:active { transform: translate3d(0, 3px, 0); transition: transform .05s; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 -1px 0 rgba(0, 0, 0, .35), 0 0 0 1px rgba(0, 0, 0, .5), 0 0 0 #08080a, 0 2px 3px rgba(0, 0, 0, .4); }
+.choice, .cell, .kind, .li { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .13), inset 0 -2px 0 rgba(0, 0, 0, .3), 0 3px 0 #08080a, 0 5px 6px rgba(0, 0, 0, .35); transition: transform .3s var(--spring-snap); }
+.choice:active, .cell:active, .kind:active, .li:active { transform: translate3d(0, 3px, 0); transition: transform .05s; }
+.sheet { box-shadow: 0 -16px 44px rgba(0, 0, 0, .6), 0 -2px 0 rgba(255, 255, 255, .06), inset 0 1.5px 0 rgba(255, 255, 255, .14); animation: sheetup .5s var(--spring-soft); }
+@keyframes sheetup { from { transform: translate3d(0, 60px, 0); opacity: 0; } }
+.tray { box-shadow: 0 -14px 26px rgba(0, 0, 0, .4), inset 0 1.5px 0 rgba(255, 255, 255, .1); animation: trayup .45s var(--spring-soft); }
+@keyframes trayup { from { transform: translate3d(0, 40px, 0); opacity: 0; } }
+.toast { animation: toastin .45s var(--spring-soft); }
+.wheel { animation: wheelin .4s var(--spring-snap); }
+.dip i { transition: bottom .35s var(--spring-snap), background .12s; }
+.rack { animation: rackin .45s var(--spring-soft); }
+@keyframes rackin { from { transform: translate3d(-48px, 0, 0); opacity: 0; } }
+.cassette { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 -2px 0 rgba(0, 0, 0, .3), 0 4px 0 #08080a, 0 9px 14px rgba(0, 0, 0, .45); }
+.slip-tab { box-shadow: -3px 4px 10px var(--shadow), inset 2px 0 0 rgba(255, 255, 255, .6); transition: transform .45s var(--spring-snap); }
+.slip-pop { animation: dropin .5s var(--spring-soft); }
+.mode-view { animation: viewin .4s var(--spring-soft); }
+@keyframes viewin { from { opacity: 0; transform: translate3d(var(--from, 14px), 0, 0); } }
+
+/* ---- scroll + paint hygiene for 120 Hz ---- */
+.bench-scroll, .roll-scroll, .rack-body, .tray-body { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.card, .strip, .cassette { contain: layout style; }
+.line-wrap { contain: layout paint style; }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

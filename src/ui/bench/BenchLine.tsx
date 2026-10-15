@@ -1,5 +1,5 @@
 import { memo } from 'preact/compat';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { Chord, ID, Line } from '../../store/models';
 import { RhymeMark } from '../../engine/rhyme';
 import { diffEdit } from '../../engine/textdiff';
@@ -76,7 +76,11 @@ export const LineRow = memo(function LineRow(p: LineProps) {
   const { line } = p;
   const inp = useRef<HTMLTextAreaElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
-  const [dx, setDx] = useState(0);
+  const lineEl = useRef<HTMLDivElement>(null);
+  const setDx = (v: number) => {
+    if (lineEl.current) lineEl.current.style.transform = v ? `translate3d(${v}px, 0, 0)` : '';
+    wrap.current?.classList.toggle('swiping', v !== 0);
+  };
   const sw = useRef<{ x: number; y: number; on: boolean; dx: number } | null>(null);
 
   // external focus requests (after split / merge / insert)
@@ -192,9 +196,9 @@ export const LineRow = memo(function LineRow(p: LineProps) {
   );
 
   return (
-    <div class={'line-wrap' + (dx ? ' swiping' : '')} ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+    <div class="line-wrap" ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
       <div class="line-under"><Icon n="bones" size={18} /><span>BONEYARD</span></div>
-      <div class={`line fit-${p.fit}` + (p.headroom ? ' hr' : '')} data-sid={p.sid} data-lid={line.id} style={{ transform: dx ? `translateX(${dx}px)` : undefined }}>
+      <div ref={lineEl} class={`line fit-${p.fit}` + (p.headroom ? ' hr' : '')} data-sid={p.sid} data-lid={line.id}>
         {p.gutter && (
           <button class={'gut' + (p.mism ? ' mism' : '')} aria-label="Line menu" onClick={() => { lineMenu.value = { sid: p.sid, lid: line.id }; }}>
             {p.syl || ''}{p.mism ? <i>≠</i> : null}

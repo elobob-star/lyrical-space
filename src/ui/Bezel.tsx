@@ -2,7 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import { Dial } from './Dial';
 import { Icon } from './icons';
 import { currentSong, mode, saving, settings, updateCurrent, Mode } from '../store/state';
-import { grease, latch, layer, rollClock, tableTool } from '../store/ui';
+import { grease, latch, layer, rollClock, rollStats, tableTool } from '../store/ui';
 import { recording } from '../engine/recorder';
 import { feel } from '../engine/feel';
 import { sectionAbbrev, sectionNames } from '../store/models';
@@ -24,14 +24,12 @@ function Readout() {
   const m = mode.value;
   if (!song) return <div class="lcd" />;
   if (m === 'roll') {
-    const t = song.roll.text;
-    const lines = t.split('\n').filter((l) => l.trim()).length;
-    const words = (t.match(/[\p{L}\p{N}'’]+/gu) ?? []).length;
+    const { lines, words } = rollStats.value;
     const ck = rollClock.value;
     return (
       <div class="lcd" aria-label="Readout">
-        <span class="hot">ROLL</span>
-        <span>{String(lines).padStart(3, '0')}L {String(words).padStart(4, '0')}W</span>
+        <span class="hot">{String(lines).padStart(3, '0')}L</span>
+        <span>{String(words).padStart(4, '0')}W</span>
         <span class="sp" />
         {latch.value && <span class="hot blink">LATCH</span>}
         {grease.value && <span class="hot">PEN</span>}
@@ -44,8 +42,8 @@ function Readout() {
     const tool = tableTool.value;
     return (
       <div class="lcd" aria-label="Readout">
-        <span class="hot">TABLE</span>
-        <span>{String(n).padStart(2, '0')} STRIP{n === 1 ? '' : 'S'}</span>
+        <span class="hot">{String(n).padStart(2, '0')}</span>
+        <span>STRIP{n === 1 ? '' : 'S'}</span>
         <span class="sp" />
         {tool && <span class="hot blink">{tool === 'snip' ? 'SNIP' : 'TAPE'}</span>}
       </div>
@@ -55,8 +53,7 @@ function Readout() {
   const map = song.arrangement.map((a) => { const s = song.sections.find((x) => x.id === a.sectionId); return s ? sectionAbbrev(s, names) : ''; }).join(' ');
   return (
     <div class="lcd" aria-label="Readout">
-      <span class="hot">BENCH</span>
-      <span class="dim">{map || '—'}</span>
+      <span class="hot">{map || '—'}</span>
       <span class="sp" />
       <span>{song.bpm}{song.key ? ' ' + song.key : ''}</span>
     </div>

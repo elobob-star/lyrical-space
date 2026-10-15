@@ -297,3 +297,23 @@ Known gaps / next:
   latch (Gboard composition) and microphone permission flow.
 * Section reorder uses ◀ ▶ on the song map rather than free dragging.
 * Roadmap: cloud sync, Android share-into-Portascribe intent, home-screen quick-catch widget, collaborative writing.
+
+## 12. Depth & performance pass
+
+**Materials** (light from top-left, elevation = layered shadows): keys are a dark recessed *socket*, a static *side wall*
+and a *moving cap* — pressing is a pure `transform` (no shadow repaint) driven by spring easing (`linear()` curves);
+the dial is machined metal (conic-gradient brushed top, knurled ridges, orange cap, fixed specular gloss);
+the screen has a chamfered glass frame with reflection; the Roll pad has page curvature and a coil that casts a shadow;
+Table notes curl at the corner and are held by domed pins/washi tape and lift + tilt with finger velocity;
+Bench cards are thicker with stacked take edges and a 3D page-flip between takes; chord stamps are brushed chrome.
+A soft specular **tilt sheen** drifts across the chassis with the phone's orientation (DIP switch: TILT LIGHTING).
+
+**120 Hz budget (8.3 ms/frame)**
+* Press/drag/lever/dial/line-swipe write `transform` directly to the DOM — no component re-render per pointer move.
+* Shuffle uses FLIP (WAAPI transforms) instead of animating `left/top`.
+* The Roll mirror is in normal flow so the page height needs no JS measurement; readout counts are throttled.
+* Key feedback (sound + haptic) fires on pointer-*down*; `touch-action: manipulation` removes tap delay.
+* `MainActivity` requests the display's highest refresh mode at the current resolution (90/120/144 Hz) so WebView
+  content isn't capped at 60 Hz.
+* Measured with `scripts/e2e/perf.mjs` (4× CPU throttle): long-roll typing layout 13.9 → 8.2 ms/key, long tasks 24 → 0;
+  strip drag layout 0.6 → 0 ms/move.

@@ -43,6 +43,7 @@ export function Settings() {
       <Dip label="HAPTICS" hint="buzz on clicks, latches and punches" on={st.haptics} onChange={(v) => setSetting('haptics', v)} />
       <Dip label="MECHANICAL SOUNDS" hint="synthesised clicks, clunks and snips" on={st.clicks} onChange={(v) => setSetting('clicks', v)} />
       <Dip label="TYPEWRITER KEYS" hint="a tiny tick per keystroke in the Roll + carriage bell" on={st.keys} onChange={(v) => setSetting('keys', v)} />
+      <Dip label="TILT LIGHTING" hint="highlights drift across the chassis as you tilt the phone" on={st.tilt} onChange={(v) => setSetting('tilt', v)} />
       <Dip label="PAPER GRAIN" hint="fibre texture on the sheet" on={st.grain} onChange={(v) => setSetting('grain', v)} />
       <div class="grp">WRITING</div>
       <Dip label="SYLLABLE GUTTER" hint="per-line syllable count on the Bench" on={st.gutter} onChange={(v) => setSetting('gutter', v)} />

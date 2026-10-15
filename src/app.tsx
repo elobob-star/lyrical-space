@@ -1,4 +1,4 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import { boot, currentSong, mode, ready, settings } from './store/state';
 import { handleBack, keyboardOpen, layer, toast, dismissToast } from './store/ui';
 import { Bezel } from './ui/Bezel';
@@ -62,6 +62,28 @@ export function App() {
     document.querySelector('meta[name=theme-color]')?.setAttribute('content', finish === 'alu' ? '#e6e4de' : '#1f2125');
   }, [finish]);
 
+  // tilt lighting: a soft specular sheen drifts across the chassis as the phone tilts (compositor-only transform)
+  const sheen = useRef<HTMLDivElement>(null);
+  const tilt = settings.value.tilt;
+  useEffect(() => {
+    const el = sheen.current;
+    if (!el || !tilt) { if (el) el.style.transform = ''; return; }
+    let raf = 0, tx = 0, ty = 0, cx = 0, cy = 0;
+    const loop = () => {
+      cx += (tx - cx) * 0.12; cy += (ty - cy) * 0.12;
+      el.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0)`;
+      raf = Math.abs(tx - cx) + Math.abs(ty - cy) > 0.2 ? requestAnimationFrame(loop) : 0;
+    };
+    const on = (e: DeviceOrientationEvent) => {
+      if (e.gamma == null || e.beta == null) return;
+      tx = Math.max(-40, Math.min(40, e.gamma * 1.6));
+      ty = Math.max(-30, Math.min(30, (e.beta - 55) * 1.1));
+      if (!raf) raf = requestAnimationFrame(loop);
+    };
+    window.addEventListener('deviceorientation', on, { passive: true });
+    return () => { window.removeEventListener('deviceorientation', on); cancelAnimationFrame(raf); };
+  }, [tilt]);
+
   // wake lock
   const awake = settings.value.awake;
   useEffect(() => {
@@ -84,6 +106,7 @@ export function App() {
 
   return (
     <div class={'chassis' + (keyboardOpen.value ? ' kb-open' : '')} data-paper={st.paper} data-chassis={st.chassis} data-ts={st.textSize} data-grain={st.grain ? 'on' : 'off'}>
+      <div class="sheen" ref={sheen} />
       <Bezel />
       <div class="screen">
         <div class="paper-bg" />

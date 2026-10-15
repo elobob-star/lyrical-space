@@ -6,7 +6,7 @@ import { diffEdit, rebaseMarks } from '../engine/textdiff';
 import { indexAtPoint } from '../engine/hit';
 import { feel, haptic, sound } from '../engine/feel';
 import { punchPencil, pendingPencil } from '../store/actions';
-import { grease, latch, rollClock, say } from '../store/ui';
+import { grease, latch, rollClock, rollStats, say } from '../store/ui';
 import { Key, Keys } from './Key';
 import { Odometer } from './Odometer';
 import { Icon } from './icons';
@@ -103,14 +103,27 @@ export function RollView() {
   if (lastSong.current !== song.id) { lastSong.current = song.id; prev.current = text; }
   useEffect(() => { prev.current = text; }, [text, song.id]);
 
-  // auto-size textarea so the page (not the textarea) scrolls
-  useLayoutEffect(() => {
-    const el = ta.current, sc = scroller.current;
-    if (!el || !sc) return;
-    const slip = (sc.querySelector('.spark-slip') as HTMLElement | null)?.offsetHeight ?? 0;
-    el.style.height = '0px';
-    el.style.height = Math.max(el.scrollHeight, sc.clientHeight - slip) + 'px';
-  }, [text, song.roll.spark, g]);
+  // the mirror is in normal flow (it defines the page height); the textarea simply overlays it.
+  useEffect(() => {
+    const sc = scroller.current;
+    if (!sc) return;
+    const set = () => sc.style.setProperty('--roll-h', sc.clientHeight + 'px');
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(sc);
+    return () => ro.disconnect();
+  }, []);
+
+  // line/word counts for the readout: throttled so typing never pays for it
+  useEffect(() => {
+    const calc = () => {
+      const lines = text.split('\n').filter((l) => l.trim()).length;
+      const words = (text.match(/[\p{L}\p{N}'’]+/gu) ?? []).length;
+      rollStats.value = { lines, words };
+    };
+    const t = setTimeout(calc, rollStats.peek().words === 0 && rollStats.peek().lines === 0 ? 0 : 220);
+    return () => clearTimeout(t);
+  }, [text, song.id]);
 
   // sprint clock
   useEffect(() => {
@@ -275,8 +288,6 @@ export function RollView() {
 
   useEffect(() => { if (g) ta.current?.blur(); }, [g]);
 
-  const lines = text.split('\n').filter((l) => l.trim()).length;
-  const words = (text.match(/[\p{L}\p{N}'’]+/gu) ?? []).length;
   const elapsed = sprint ? now - sprint.start : 0;
   useEffect(() => { rollClock.value = sprint ? elapsed : null; }, [elapsed, !!sprint]);
   useEffect(() => () => { rollClock.value = null; }, []);

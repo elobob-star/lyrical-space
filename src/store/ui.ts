@@ -62,3 +62,6 @@ export type TableTool = null | 'snip' | 'tape';
 export const tableTool = signal<TableTool>(null);
 /** sprint clock (ms) published by the Roll so the bezel readout can show it */
 export const rollClock = signal<number | null>(null);
+
+/** throttled line/word counts for the bezel readout (updated by the Roll) */
+export const rollStats = signal({ lines: 0, words: 0 });

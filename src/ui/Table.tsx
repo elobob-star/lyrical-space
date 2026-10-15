@@ -42,10 +42,7 @@ export function TableView() {
   const song = currentSong.value!;
   const board = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 360, h: 600 });
-  const [drag, setDragState] = useState<null | { id: ID; x: number; y: number }>(null);
-  const dragRef = useRef<typeof drag>(null);
-  const setDrag = (v: typeof drag) => { dragRef.current = v; setDragState(v); };
-  const [lever, setLever] = useState(0);
+  const knobRef = useRef<HTMLDivElement>(null);
   const sheet = sheetState.value;
   const sel = selected.value;
 
@@ -60,36 +57,47 @@ export function TableView() {
 
   const tool = tableTool.value;
 
-  // ---- strip pointer handling ----
-  const info = useRef<{ id: ID; px: number; py: number; ox: number; oy: number; moved: boolean; t: number } | null>(null);
+  // ---- strip pointer handling (drag writes straight to the DOM: no re-render per move) ----
+  const info = useRef<{ id: ID; el: HTMLElement; px: number; py: number; ox: number; oy: number; rot: number; moved: boolean; lx: number; lt: number; tilt: number; cx: number; cy: number } | null>(null);
   const onDown = (e: PointerEvent, s: Strip) => {
     if (tool === 'snip') return; // handled on click
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
-    info.current = { id: s.id, px: e.clientX, py: e.clientY, ox: s.x, oy: s.y, moved: false, t: Date.now() };
+    info.current = { id: s.id, el, px: e.clientX, py: e.clientY, ox: s.x, oy: s.y, rot: s.rot, moved: false, lx: e.clientX, lt: performance.now(), tilt: 0, cx: s.x, cy: s.y };
   };
   const onMove = (e: PointerEvent) => {
     const d = info.current;
     if (!d) return;
-    const dx = e.clientX - d.px, dy = e.clientY - d.py;
+    let dx = e.clientX - d.px, dy = e.clientY - d.py;
     if (!d.moved && Math.hypot(dx, dy) < 6) return;
-    if (!d.moved) { d.moved = true; haptic('light'); selected.value = null; }
-    setDrag({ id: d.id, x: Math.max(-0.08, Math.min(0.9, d.ox + dx / size.w)), y: Math.max(0, Math.min(0.94, d.oy + dy / size.h)) });
+    if (!d.moved) { d.moved = true; haptic('light'); if (selected.value) selected.value = null; }
+    // keep the note on the board
+    const nx = Math.max(-0.08, Math.min(0.9, d.ox + dx / size.w)), ny = Math.max(0, Math.min(0.94, d.oy + dy / size.h));
+    d.cx = nx; d.cy = ny;
+    dx = (nx - d.ox) * size.w; dy = (ny - d.oy) * size.h;
+    // paper lags behind the finger: tilt with horizontal velocity
+    const now = performance.now();
+    const vx = (e.clientX - d.lx) / Math.max(1, now - d.lt);
+    d.tilt += (Math.max(-9, Math.min(9, vx * 14)) - d.tilt) * 0.35;
+    d.lx = e.clientX; d.lt = now;
+    d.el.classList.add('dragging');
+    d.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${d.rot + d.tilt}deg) scale(1.045)`;
   };
   const onUp = (e: PointerEvent, s: Strip) => {
     const d = info.current;
     info.current = null;
     if (!d) return;
     if (d.moved) {
-      const cur = dragRef.current;
-      if (cur) {
-        updateCurrent((song2) => {
-          const z = Math.max(0, ...song2.table.map((x) => x.z)) + 1;
-          const t = song2.table.find((x) => x.id === d.id);
-          if (t) { t.x = cur.x; t.y = cur.y; t.z = z; }
-        });
-      }
-      setDrag(null);
+      // commit: set the final geometry on the element first so there is no visual jump, then update the store
+      d.el.style.left = `${d.cx * 100}%`; d.el.style.top = `${d.cy * 100}%`;
+      d.el.style.transform = `rotate(${d.rot}deg)`;
+      d.el.classList.remove('dragging');
+      d.el.animate([{ transform: `rotate(${d.rot + d.tilt * 0.6}deg) scale(1.045)` }, { transform: `rotate(${d.rot}deg) scale(1)` }], { duration: 300, easing: 'cubic-bezier(.2,1.4,.4,1)' });
+      updateCurrent((song2) => {
+        const z = Math.max(0, ...song2.table.map((x) => x.z)) + 1;
+        const t = song2.table.find((x) => x.id === d.id);
+        if (t) { t.x = d.cx; t.y = d.cy; t.z = z; }
+      });
       sound('thock');
       return;
     }
@@ -125,26 +133,34 @@ export function TableView() {
     });
   };
 
-  // ---- lever ----
-  const lv = useRef<{ y: number; active: boolean } | null>(null);
+  // ---- lever (direct DOM, springs back) ----
+  const lv = useRef<{ y: number; active: boolean; p: number; step: number } | null>(null);
   const LEVER_H = 150;
-  const lvDown = (e: PointerEvent) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); lv.current = { y: e.clientY, active: true }; };
+  const setLever = (p: number, spring: boolean) => {
+    const k = knobRef.current;
+    if (!k) return;
+    k.classList.toggle('drag', !spring);
+    k.style.transform = `translate3d(0, ${p * LEVER_H}px, 0)`;
+  };
+  const lvDown = (e: PointerEvent) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); lv.current = { y: e.clientY, active: true, p: 0, step: 0 }; setLever(0, false); };
   const lvMove = (e: PointerEvent) => {
-    if (!lv.current?.active) return;
-    const p = Math.max(0, Math.min(1, (e.clientY - lv.current.y) / LEVER_H));
-    setLever((prev) => { if (Math.floor(p * 6) !== Math.floor(prev * 6)) sound('tock'); return p; });
+    const l = lv.current;
+    if (!l?.active) return;
+    l.p = Math.max(0, Math.min(1, (e.clientY - l.y) / LEVER_H));
+    const step = Math.floor(l.p * 6);
+    if (step !== l.step) { l.step = step; sound('tock'); haptic('light'); }
+    setLever(l.p, false);
   };
   const lvUp = () => {
-    if (!lv.current?.active) return;
+    const l = lv.current;
+    if (!l?.active) return;
     lv.current = null;
-    setLever((p) => {
-      if (p > 0.8) {
-        feel('ratchet', 'heavy');
-        const n = dealFromScraps();
-        say(n ? `DEALT ${n} FRAGMENTS` : 'SHOEBOX & BONEYARD ARE EMPTY — CATCH SOME LINES');
-      }
-      return 0;
-    });
+    setLever(0, true);
+    if (l.p > 0.8) {
+      feel('ratchet', 'heavy');
+      const n = dealFromScraps();
+      say(n ? `DEALT ${n} FRAGMENTS` : 'SHOEBOX & BONEYARD ARE EMPTY — CATCH SOME LINES');
+    }
   };
 
   const strips = [...song.table].sort((a, b) => a.z - b.z);
@@ -162,19 +178,17 @@ export function TableView() {
           </div>
         )}
         {strips.map((s) => {
-          const d = drag?.id === s.id ? drag : null;
-          const x = d ? d.x : s.x, y = d ? d.y : s.y;
           return (
-            <div key={s.id}
-              class={'strip n' + hashId(s.id) + ' f-' + s.from + (sel === s.id ? ' sel' : '') + (taped.value === s.id ? ' taped' : '') + (d ? ' dragging' : '') + (tool === 'snip' ? ' snippable' : '') + (s.from === 'splice' ? ' spliced' : '')}
-              style={{ left: `${x * 100}%`, top: `${y * 100}%`, zIndex: d ? 999 : s.z, transform: `rotate(${s.rot}deg)${d ? ' scale(1.04)' : ''}` }}
-              onPointerDown={(e) => onDown(e as any, s)} onPointerMove={onMove as any} onPointerUp={(e) => onUp(e as any, s)} onPointerCancel={() => { info.current = null; setDrag(null); }}
+            <div key={s.id} data-id={s.id} data-rot={s.rot}
+              class={'strip n' + hashId(s.id) + ' f-' + s.from + (sel === s.id ? ' sel' : '') + (taped.value === s.id ? ' taped' : '') + (tool === 'snip' ? ' snippable' : '') + (s.from === 'splice' ? ' spliced' : '')}
+              style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%`, zIndex: s.z, transform: `rotate(${s.rot}deg)`, '--r': s.rot } as any}
+              onPointerDown={(e) => onDown(e as any, s)} onPointerMove={onMove as any} onPointerUp={(e) => onUp(e as any, s)} onPointerCancel={() => { const d = info.current; info.current = null; if (d) { d.el.classList.remove('dragging'); d.el.style.transform = `rotate(${d.rot}deg)`; } }}
               onClick={(e) => onClickSnip(e as any, s)}>
               <span class="st" data-s="0">{s.text}</span>
             </div>
           );
         })}
-        {selStrip && !drag && (
+        {selStrip && (
           <div class="strip-actions" style={{
             left: `${Math.max(2, Math.min(70, selStrip.x * 100))}%`,
             top: selStrip.y > 0.14 ? `calc(${selStrip.y * 100}% - 46px)` : `calc(${selStrip.y * 100}% + 70px)`, zIndex: 1000,
@@ -197,7 +211,7 @@ export function TableView() {
         <div class="lever-slot" aria-label="Deal lever">
           <span class="lever-label">DEAL</span>
           <div class="lever-track" />
-          <div class="lever-knob" style={{ transform: `translateY(${lever * LEVER_H}px)` }}
+          <div class="lever-knob" ref={knobRef}
             onPointerDown={lvDown as any} onPointerMove={lvMove as any} onPointerUp={lvUp} onPointerCancel={lvUp} />
         </div>
       </div>
@@ -268,6 +282,12 @@ export function TableKeys() {
       <Key icon="scissors" label="Snip" tone="blue" on={tool === 'snip'} led="orange" onClick={() => { tableTool.value = tool === 'snip' ? null : 'snip'; taped.value = null; selected.value = null; }} />
       <Key icon="tape" label="Tape" tone="green" on={tool === 'tape'} led="orange" onClick={() => { tableTool.value = tool === 'tape' ? null : 'tape'; taped.value = null; selected.value = null; }} />
       <Key icon="shuffle" label="Shuffle" tone="yellow" sound="ratchet" onClick={() => {
+        // FLIP: remember where every note is, reshuffle, then animate each from old → new on the compositor
+        const before = new Map<string, { x: number; y: number; rot: number }>();
+        document.querySelectorAll<HTMLElement>('.board .strip').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          before.set(el.dataset.id!, { x: r.left, y: r.top, rot: Number(el.dataset.rot) });
+        });
         updateCurrent((d) => {
           const out: Strip[] = [];
           for (const s of d.table) {
@@ -277,6 +297,18 @@ export function TableKeys() {
           d.table = out;
         });
         selected.value = null;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          document.querySelectorAll<HTMLElement>('.board .strip').forEach((el, i) => {
+            const b = before.get(el.dataset.id!);
+            if (!b) return;
+            const r = el.getBoundingClientRect();
+            const nr = Number(el.dataset.rot);
+            el.animate(
+              [{ transform: `translate3d(${b.x - r.left}px, ${b.y - r.top}px, 0) rotate(${b.rot}deg) scale(1.03)` }, { transform: `rotate(${nr}deg) scale(1)` }],
+              { duration: 620, delay: i * 25, easing: 'cubic-bezier(.2,1.25,.3,1)', fill: 'backwards' },
+            );
+          });
+        }));
       }} />
     </Keys>
   );

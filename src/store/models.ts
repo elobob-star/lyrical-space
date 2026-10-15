@@ -84,6 +84,7 @@ export interface Settings {
   online: boolean;
   awake: boolean;
   leftHand: boolean;
+  tilt: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -98,6 +99,7 @@ export const DEFAULT_SETTINGS: Settings = {
   online: true,
   awake: false,
   leftHand: false,
+  tilt: true,
 };
 
 export const INKS = ['#d9432b', '#c98a14', '#7d8b2e', '#1f8a84', '#3b4fa8', '#8a3f86', '#c9507a', '#5b6670'];
