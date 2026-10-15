@@ -49,20 +49,20 @@ export function Dial({ value, onChange }: { value: number; onChange: (v: number)
       role="slider" aria-label="Mode dial" aria-valuemin={0} aria-valuemax={2} aria-valuenow={value}>
       <svg viewBox="-30 -30 60 60">
         <defs>
-          <radialGradient id="dg-base" cx="35%" cy="30%"><stop offset="0" stop-color="#3b3e46" /><stop offset="1" stop-color="#121316" /></radialGradient>
-          <radialGradient id="dg-cap" cx="38%" cy="30%"><stop offset="0" stop-color="#5a5e68" /><stop offset="1" stop-color="#23252a" /></radialGradient>
+          <radialGradient id="dg-base" cx="35%" cy="30%"><stop offset="0" style={{ stopColor: 'var(--knob-a)' }} /><stop offset="1" style={{ stopColor: 'var(--knob-b)' }} /></radialGradient>
+          <radialGradient id="dg-cap" cx="38%" cy="30%"><stop offset="0" stop-color="#ff9a63" /><stop offset="1" stop-color="#e2470f" /></radialGradient>
         </defs>
-        <circle r="29" fill="#0c0d0f" />
-        <circle r="28.2" fill="none" stroke="rgba(255,255,255,.07)" />
+        <circle r="29" style={{ fill: 'var(--well)' }} />
+        <circle r="28.2" fill="none" stroke="rgba(255,255,255,.12)" />
         {POS.map((p) => (
-          <line x1="0" y1="-26.5" x2="0" y2="-29" stroke={Math.abs(p - POS[value]) < 1 ? '#ff5b1f' : '#6a6d75'} stroke-width="1.6" stroke-linecap="round" transform={`rotate(${p})`} />
+          <line x1="0" y1="-26.5" x2="0" y2="-29" stroke={Math.abs(p - POS[value]) < 1 ? '#ff5b1f' : '#8d8f96'} stroke-width="1.6" stroke-linecap="round" transform={`rotate(${p})`} />
         ))}
         <g class="knob" style={{ transform: `rotate(${angle}deg)` }}>
-          <circle r="23" fill="url(#dg-base)" stroke="#000" stroke-width=".8" />
-          {knurl.map((a) => <line x1="0" y1="-23" x2="0" y2="-19.8" stroke="rgba(255,255,255,.22)" stroke-width="1" transform={`rotate(${a})`} />)}
-          <circle r="15.5" fill="url(#dg-cap)" stroke="rgba(0,0,0,.6)" stroke-width=".8" />
-          <circle r="15.5" fill="none" stroke="rgba(255,255,255,.13)" stroke-width=".8" transform="translate(0 -.6)" />
-          <path d="M0 -17.5 L0 -6" stroke="#ff5b1f" stroke-width="3" stroke-linecap="round" />
+          <circle r="23" fill="url(#dg-base)" style={{ stroke: 'var(--knob-ring)' }} stroke-width="1" />
+          {knurl.map((a) => <line x1="0" y1="-23" x2="0" y2="-19.8" stroke="rgba(0,0,0,.28)" stroke-width="1" transform={`rotate(${a})`} />)}
+          <circle r="15.5" fill="url(#dg-cap)" stroke="rgba(0,0,0,.35)" stroke-width=".8" />
+          <circle r="15.5" fill="none" stroke="rgba(255,255,255,.35)" stroke-width=".8" transform="translate(0 -.6)" />
+          <path d="M0 -20 L0 -5" stroke="#fff" stroke-width="3" stroke-linecap="round" />
         </g>
       </svg>
     </div>

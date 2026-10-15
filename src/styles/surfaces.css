@@ -17,11 +17,7 @@
 .choice:active { transform: translateY(2px); }
 
 /* ====== ROLL ====== */
-.roll-head { flex: none; display: flex; align-items: center; gap: 14px; height: 36px; padding: 0 12px; border-bottom: 1px solid var(--rule-strong); background: linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.02)); z-index: 3; color: var(--ink-2); }
-.roll.latched .roll-head { box-shadow: inset 0 -2px 0 var(--led-amber); }
-.clock { display: flex; align-items: center; gap: 8px; height: 100%; }
-.clk { font: 700 12.5px var(--font-ui); letter-spacing: .08em; color: var(--ink); }
-.ctr { display: flex; align-items: center; gap: 6px; }
+.roll.latched .ctr { display: flex; align-items: center; gap: 6px; }
 .ctr i { font-style: normal; font-size: 7.5px; letter-spacing: .2em; color: var(--ink-faint); }
 .odo { display: inline-flex; gap: 1px; background: #0c0d0f; padding: 2px 3px; border-radius: 3px; box-shadow: inset 0 1px 3px #000, 0 1px 0 rgba(255,255,255,.2); }
 .odo-d { width: 10px; height: 15px; overflow: hidden; position: relative; background: linear-gradient(#2b2b2b, #0a0a0a 50%, #1d1d1d); border-radius: 1px; }
@@ -31,7 +27,7 @@
 .roll-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; position: relative; scrollbar-width: none; }
 .roll-scroll::-webkit-scrollbar { display: none; }
 .roll-sheet {
-  position: relative; min-height: 100%;
+  position: relative; min-height: 100%; --pad-top: 6px;
   background-image:
     linear-gradient(90deg, transparent 22px, var(--rule-strong) 22px 23px, transparent 23px),
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--rule) calc(var(--lh) - 1px), var(--rule) var(--lh));
@@ -52,8 +48,7 @@
 .roll-mirror .pv { background: linear-gradient(transparent 7%, rgba(255, 150, 40, .62) 7%, rgba(255, 150, 40, .62) 93%, transparent 93%); }
 .roll.grease .roll-mirror { pointer-events: auto; touch-action: pan-y; user-select: none; cursor: crosshair; }
 .roll.grease .roll-input { pointer-events: none; }
-.roll.grease .roll-head { box-shadow: inset 0 -2px 0 var(--led-yellow); }
-.spark-slip {
+.roll.grease .spark-slip {
   position: relative; margin: 18px 18px 4px 20px; padding: 14px 14px 9px; background: var(--strip); color: var(--strip-ink); transform: rotate(-1.1deg);
   box-shadow: 0 1px 0 rgba(0, 0, 0, .08), 0 8px 16px var(--shadow); border-radius: 2px; animation: dropin .35s var(--ease);
 }
@@ -250,7 +245,7 @@
 
 /* sheets: extras */
 .seg { display: flex; gap: 0; margin-bottom: 10px; }
-.seg button { flex: 1; height: 34px; background: #2c2f35; font: 700 10px var(--font-ui); letter-spacing: .16em; color: var(--silk-dim); }
+.seg button { flex: 1; min-width: 25%; height: 34px; background: #2c2f35; font: 700 10px var(--font-ui); letter-spacing: .16em; color: var(--silk-dim); }
 .seg button:first-child { border-radius: 7px 0 0 7px; } .seg button:last-child { border-radius: 0 7px 7px 0; }
 .seg button.on { background: var(--orange); color: #1a0d05; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -345,3 +340,48 @@
 .kb-open .title-tape { height: 36px; }
 .kb-open .dial { width: 50px; height: 50px; }
 button:disabled { cursor: default; }
+
+/* ============ scoped dark panels (device OLED look) ============ */
+.sheet, .rack, .tray, .wheel-scrim, .mapbar, .strip-actions, .slip-pop { --silk: #d9d4c5; --silk-dim: #8b887e; --silk-soft: #a7a396; color: var(--silk); font-family: var(--font-ui); }
+
+/* ============ ROLL: spiral-bound tear-off pad ============ */
+.coil { flex: none; height: 30px; position: relative; z-index: 4; background: linear-gradient(180deg, var(--paper-2), var(--paper)); border-bottom: 1px dashed var(--rule-strong);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .12);
+  --coil: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='21' height='34'><ellipse cx='10.5' cy='19' rx='5' ry='3.6' fill='%23141518'/><ellipse cx='10.5' cy='18.2' rx='5' ry='3' fill='none' stroke='%23fff' stroke-opacity='.18'/><path d='M4 1 C 6 12, 10 17, 17 20' stroke='%23000' stroke-opacity='.35' stroke-width='4.2' fill='none' transform='translate(1.4 2)' stroke-linecap='round'/><path d='M4 1 C 6 12, 10 17, 17 20' stroke='%23c8cbd2' stroke-width='3.4' fill='none' stroke-linecap='round'/><path d='M4 1 C 6 12, 10 17, 17 20' stroke='%23fff' stroke-opacity='.85' stroke-width='1.1' fill='none' stroke-linecap='round' transform='translate(-.6 -.6)'/></svg>");
+  background-image: var(--coil); background-repeat: repeat-x; background-size: 21px 34px; background-position: 0 -3px;
+}
+.roll.latched .coil { box-shadow: 0 2px 0 var(--led-amber), 0 2px 4px rgba(0, 0, 0, .12); }
+.roll.grease .coil { box-shadow: 0 2px 0 var(--led-yellow), 0 2px 4px rgba(0, 0, 0, .12); }
+.roll-sheet { background-position: 0 0, 0 calc(12px + var(--pad-top)); }
+
+/* ============ TABLE: cork board + sticky notes ============ */
+.board {
+  background-color: #c79a63; touch-action: none;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(255, 235, 200, .28) 0 1.5px, transparent 2.4px),
+    radial-gradient(circle at 72% 64%, rgba(80, 45, 15, .3) 0 1.6px, transparent 2.6px),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='c' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='3' seed='9'/><feColorMatrix values='0 0 0 0 .32  0 0 0 0 .18  0 0 0 0 .06  0 0 0 1.1 -.35'/></filter><rect width='100%' height='100%' filter='url(%23c)'/></svg>");
+  background-size: 17px 17px, 23px 23px, 240px 240px;
+  box-shadow: inset 0 0 40px rgba(60, 30, 5, .45);
+}
+.board-label { left: 10px; top: 9px; padding: 3px 7px; border-radius: 2px; background: #17181b; color: #ffb347; font: 500 11px var(--font-lcd); letter-spacing: .08em; text-shadow: 0 0 5px rgba(255, 150, 40, .5); box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
+.empty-table { color: #4a3216; } .empty-table b { color: #2a1c0a; }
+.strip { background: #fff3a8; border-radius: 1px; padding: 14px 14px 11px; box-shadow: 0 1px 0 rgba(0, 0, 0, .12), 0 7px 12px rgba(40, 20, 0, .4); }
+.strip.n1 { background: #ffc7d3; } .strip.n2 { background: #bfe1ff; } .strip.n3 { background: #fffaf0; }
+.strip::after { content: ''; position: absolute; top: -5px; left: 50%; margin-left: -7px; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff9 0 12%, transparent 40%), var(--pin, #e23d3d); box-shadow: 0 3px 3px rgba(0, 0, 0, .45), inset 0 -2px 2px rgba(0, 0, 0, .25); }
+.strip.f-bone { --pin: #2f6fe0; } .strip.f-typed { --pin: #ffd23a; } .strip.f-splice::after { display: none; }
+.strip.f-spark::after { top: -9px; width: 56px; height: 17px; margin-left: -28px; border-radius: 1px; transform: rotate(-3deg); background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .55) 0 4px, rgba(255, 255, 255, .2) 4px 8px), rgba(120, 200, 170, .75); box-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.strip.f-spark.n0::after { background-color: rgba(255, 150, 170, .8); } .strip.f-spark.n2::after { background-color: rgba(255, 210, 90, .85); }
+.lever-slot { background: linear-gradient(90deg, var(--knob-a), var(--knob-b)); border-radius: 7px; width: 30px; right: 7px; top: 40px; height: 212px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4), 0 4px 8px rgba(0, 0, 0, .45); }
+.lever-label { color: #2a2925; left: -12px; }
+.lever-track { background: #101113; width: 8px; margin-left: -4px; }
+.lever-knob { margin-left: -15px; }
+
+/* ============ BENCH: ruled index cards ============ */
+:root { --card-rule: rgba(60, 110, 200, .26); --card-red: rgba(214, 62, 52, .55); }
+[data-paper='midnight'] { --card-rule: rgba(255, 255, 255, .08); --card-red: rgba(255, 120, 100, .45); }
+.card { border-radius: 4px; border-top: 0; box-shadow: 0 1px 0 rgba(0, 0, 0, .1), 0 6px 14px var(--shadow); overflow: visible; }
+.card::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: var(--kc); border-radius: 4px 4px 0 0; }
+.card-head { padding-top: 11px; border-bottom: 2px solid var(--card-red); margin: 0 0 0 0; }
+.line { border-bottom: 1px solid var(--card-rule); }
+.line-wrap:last-child .line { border-bottom: 0; }

@@ -54,3 +54,11 @@ export const keyboardOpen = signal(false);
 
 /** bumps when the dictionary finishes loading so analysis re-renders */
 export const cmuTick = signal(0);
+
+// ---------- tool state shared with the bezel readout ----------
+export const latch = signal(false);
+export const grease = signal(false);
+export type TableTool = null | 'snip' | 'tape';
+export const tableTool = signal<TableTool>(null);
+/** sprint clock (ms) published by the Roll so the bezel readout can show it */
+export const rollClock = signal<number | null>(null);

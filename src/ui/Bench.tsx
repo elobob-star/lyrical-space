@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
-  ID, SECTION_KINDS, Section, SectionKind, Song, activeTake, sectionNames,
+  ID, SECTION_KINDS, Section, SectionKind, Song, activeTake, sectionAbbrev, sectionNames,
 } from '../store/models';
 import { currentSong, updateCurrent } from '../store/state';
 import { analyzeFlow } from '../engine/rhyme';
@@ -30,14 +30,7 @@ const sectionSheet = signal<ID | null>(null);
 const addSheet = signal(false);
 const takeSheet = signal<ID | null>(null);
 
-const ABBR: Record<SectionKind, string> = { verse: 'V', pre: 'PRE', chorus: 'C', bridge: 'B', hook: 'H', intro: 'IN', outro: 'OUT', tag: 'TAG' };
-
-function abbrev(song: Song, sec: Section, names: Map<ID, string>): string {
-  const n = names.get(sec.id) ?? '';
-  const num = /(\d+)$/.exec(n)?.[1] ?? '';
-  if (sec.name?.trim()) return sec.name.trim().slice(0, 3).toUpperCase();
-  return ABBR[sec.kind] + num;
-}
+const abbrev = (_song: Song, sec: Section, names: Map<ID, string>): string => sectionAbbrev(sec, names);
 
 function SongMap({ song, names }: { song: Song; names: Map<ID, string> }) {
   const sel = selectedEntry.value;
@@ -347,7 +340,7 @@ export function BenchKeys() {
   const sw = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   return (
     <Keys>
-      <Key icon="wheel" label="Wheel" on={!!wheel.value} sound={null}
+      <Key icon="wheel" label="Wheel" tone="orange" on={!!wheel.value} sound={null}
         onPointerDown={(e) => {
           const el = e.currentTarget as HTMLElement;
           if (!openWheel(el, true)) return;
@@ -360,10 +353,10 @@ export function BenchKeys() {
           if (s.moved) moveWheel(e.clientX, e.clientY);
         }}
         onPointerUp={(e) => { const s = sw.current; sw.current = null; if (s) releaseWheel(e.clientX, e.clientY, s.moved); }} />
-      <Key icon="chord" label="Chords" on={t === 'chords'} led="orange" sound="thock" onClick={() => { tray.value = t === 'chords' ? null : 'chords'; if (t === 'chords') armedChord.value = null; }} />
-      <Key icon="flow" label="Flow" on={flowOn.value} led="green" sound="clunk" onClick={() => { flowOn.value = !flowOn.value; }} />
-      <Key icon="bones" label="Bones" on={t === 'bones'} led="orange" sound="thock" onClick={() => { tray.value = t === 'bones' ? null : 'bones'; }} />
-      <Key icon="export" label="Export" sound="thock" onClick={() => { layer.value = 'export'; }} />
+      <Key icon="chord" label="Chords" tone="blue" on={t === 'chords'} led="orange" sound="thock" onClick={() => { tray.value = t === 'chords' ? null : 'chords'; if (t === 'chords') armedChord.value = null; }} />
+      <Key icon="flow" label="Flow" tone="green" on={flowOn.value} led="green" sound="clunk" onClick={() => { flowOn.value = !flowOn.value; }} />
+      <Key icon="bones" label="Bones" tone="yellow" on={t === 'bones'} led="orange" sound="thock" onClick={() => { tray.value = t === 'bones' ? null : 'bones'; }} />
+      <Key icon="export" label="Export" tone="cap" sound="thock" onClick={() => { layer.value = 'export'; }} />
     </Keys>
   );
 }

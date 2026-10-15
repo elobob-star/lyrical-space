@@ -69,10 +69,12 @@ export interface Scrap {
   used: number;
 }
 
-export type Paper = 'newsprint' | 'graph' | 'midnight';
+export type Paper = 'newsprint' | 'legal' | 'graph' | 'midnight';
+export type Chassis = 'alu' | 'charcoal';
 
 export interface Settings {
   paper: Paper;
+  chassis: Chassis;
   haptics: boolean;
   clicks: boolean;
   keys: boolean;
@@ -86,6 +88,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   paper: 'newsprint',
+  chassis: 'alu',
   haptics: true,
   clicks: true,
   keys: false,
@@ -136,4 +139,11 @@ export function lineCount(song: Song): number {
   let n = 0;
   for (const sec of song.sections) for (const l of activeTake(sec).lines) if (l.text.trim()) n++;
   return n;
+}
+
+const ABBR: Record<SectionKind, string> = { verse: 'V', pre: 'PRE', chorus: 'C', bridge: 'B', hook: 'H', intro: 'IN', outro: 'OUT', tag: 'TAG' };
+export function sectionAbbrev(sec: Section, names: Map<ID, string>): string {
+  if (sec.name?.trim()) return sec.name.trim().slice(0, 3).toUpperCase();
+  const num = /(\d+)$/.exec(names.get(sec.id) ?? '')?.[1] ?? '';
+  return ABBR[sec.kind] + num;
 }

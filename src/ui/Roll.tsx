@@ -6,14 +6,12 @@ import { diffEdit, rebaseMarks } from '../engine/textdiff';
 import { indexAtPoint } from '../engine/hit';
 import { feel, haptic, sound } from '../engine/feel';
 import { punchPencil, pendingPencil } from '../store/actions';
-import { say } from '../store/ui';
+import { grease, latch, rollClock, say } from '../store/ui';
 import { Key, Keys } from './Key';
 import { Odometer } from './Odometer';
 import { Icon } from './icons';
 import { setMode } from './Bezel';
 
-export const latch = signal(false);
-export const grease = signal(false);
 const pulseGrease = signal(false);
 
 const isWordCh = (c: string | undefined) => !!c && /[\p{L}\p{N}'’]/u.test(c);
@@ -280,18 +278,12 @@ export function RollView() {
   const lines = text.split('\n').filter((l) => l.trim()).length;
   const words = (text.match(/[\p{L}\p{N}'’]+/gu) ?? []).length;
   const elapsed = sprint ? now - sprint.start : 0;
+  useEffect(() => { rollClock.value = sprint ? elapsed : null; }, [elapsed, !!sprint]);
+  useEffect(() => () => { rollClock.value = null; }, []);
 
   return (
     <div class={'mode-view roll' + (g ? ' grease' : '') + (lt ? ' latched' : '')}>
-      <div class="roll-head">
-        <button class="clock" onClick={() => { setSprint(null); setNow(Date.now()); feel('click'); }} aria-label="Sprint clock; tap to reset">
-          <span class={'led ' + (sprint ? 'on red blink' : '')} />
-          <span class="clk">{fmtClock(elapsed)}</span>
-        </button>
-        <span class="grow" />
-        <span class="ctr"><i>LINES</i><Odometer value={lines} /></span>
-        <span class="ctr"><i>WORDS</i><Odometer value={words} digits={4} /></span>
-      </div>
+      <div class="coil" aria-hidden="true" />
       <div class="roll-scroll" ref={scroller}>
         {song.roll.spark && (
           <div class="spark-slip">
@@ -348,16 +340,16 @@ export function RollKeys() {
   const pending = pendingPencil(song);
   return (
     <Keys>
-      <Key icon="latch" label="Latch" on={latch.value} led="amber" sound="clunk"
+      <Key icon="latch" label="Latch" tone="yellow" on={latch.value} led="amber" sound="clunk"
         onClick={() => { latch.value = !latch.value; if (latch.value) say('LATCHED — backspace now leaves ghost ink', undefined, 2200); }} />
-      <Key icon="grease" label="Grease" on={grease.value} led="yellow" pulse={pulseGrease.value && !grease.value}
+      <Key icon="grease" label="Grease" tone="blue" on={grease.value} led="yellow" pulse={pulseGrease.value && !grease.value}
         onClick={() => { grease.value = !grease.value; pulseGrease.value = false; if (grease.value) say('PRESS & HOLD, THEN DRAG OVER WORDS', undefined, 2600); }} />
-      <Key icon="spark" label="Spark" sound="ratchet" onClick={() => {
+      <Key icon="spark" label="Spark" tone="orange" sound="ratchet" onClick={() => {
         const s = drawSpark();
         if (!s) { say('SHOEBOX EMPTY — CATCH A LINE WITH THE SLIP →'); return; }
         updateCurrent((d) => { d.roll.spark = s.text; });
       }} />
-      <Key icon="punch" label="Punch" hot={pending > 0} badge={pending || null} sound="chk" onClick={() => {
+      <Key icon="punch" label="Punch" tone="ink" hot={pending > 0} badge={pending || null} sound="chk" onClick={() => {
         const n = punchPencil();
         if (!n) { say(pending ? 'ONLY GHOST INK IN THOSE MARKS' : 'NOTHING MARKED — GREASE-DRAG OVER LINES FIRST'); return; }
         haptic('heavy');

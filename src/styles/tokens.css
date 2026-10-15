@@ -14,6 +14,8 @@
   --led-yellow: #ffe14a;
 
   --font-ui: 'Space Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --font-silk: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-lcd: 'Doto', 'Space Mono', monospace;
   --font-type: 'Courier Prime', 'Courier New', ui-monospace, monospace;
   --font-display: 'Special Elite', 'Courier Prime', monospace;
   --font-hand: 'Caveat', 'Comic Sans MS', cursive;
@@ -64,4 +66,35 @@
   --hl: rgba(255, 214, 10, .38);
   --card: #322e27; --card-2: #3b362d;
   --grain-a: .3;
+}
+
+[data-paper='legal'] {
+  --paper: #f1e4a0; --paper-2: #e6d68a; --paper-edge: #cdbd6c;
+  --ink: #1d2230; --ink-2: #3a4258; --ink-faint: rgba(29, 34, 48, .45);
+  --rule: rgba(52, 96, 190, .32); --rule-strong: rgba(214, 62, 52, .55);
+  --strip: #fbf6dc; --strip-ink: #1d2230;
+  --shadow: rgba(60, 45, 5, .35);
+  --hl: rgba(255, 120, 190, .5);
+  --card: #fbf6e0; --card-2: #ecdfa6;
+  --grain-a: .15;
+}
+
+/* ---- chassis finishes ---- */
+.chassis[data-chassis='alu'] {
+  --ch-top: #e6e4de; --ch-bot: #cbc9c1; --ch-line: rgba(0, 0, 0, .16); --ch-hi: rgba(255, 255, 255, .75);
+  --silk: #2a2925; --silk-dim: #7b786e; --silk-soft: #55524a;
+  --cap: #f4f2eb; --cap-ink: #25241f; --cap-edge: #a9a69b;
+  --well: #17181b; --well-hi: rgba(255, 255, 255, .5);
+  --label-bg: #f7f4ea; --label-ink: #14130f;
+  --knob-a: #f2f0ea; --knob-b: #a9a69c; --knob-ring: #9a978c;
+  --screw: #b4b1a6;
+}
+.chassis[data-chassis='charcoal'] {
+  --ch-top: #1f2125; --ch-bot: #131417; --ch-line: rgba(255, 255, 255, .06); --ch-hi: rgba(255, 255, 255, .1);
+  --silk: #d9d4c5; --silk-dim: #8b887e; --silk-soft: #a7a396;
+  --cap: #34373e; --cap-ink: #ece7d8; --cap-edge: #0b0b0d;
+  --well: #08090a; --well-hi: rgba(255, 255, 255, .08);
+  --label-bg: #0e0f11; --label-ink: #f2eee2;
+  --knob-a: #4a4d56; --knob-b: #181a1e; --knob-ring: #000;
+  --screw: #3b3e45;
 }

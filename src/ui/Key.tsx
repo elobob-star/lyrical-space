@@ -7,6 +7,7 @@ export interface KeyProps {
   label: string;
   on?: boolean;
   hot?: boolean;
+  tone?: 'orange' | 'blue' | 'yellow' | 'green' | 'red' | 'grey' | 'ink' | 'cap';
   pulse?: boolean;
   led?: 'green' | 'red' | 'amber' | 'yellow' | 'orange';
   badge?: number | string | null;
@@ -26,12 +27,12 @@ export function Key(p: KeyProps) {
       {p.led && <span class={`led ${p.led}` + (p.on ? ' on' : '')} />}
       <button
         ref={p.keyRef}
-        class={'key' + (p.on ? ' on' : '') + (p.hot ? ' hot' : '') + (p.pulse ? ' pulse' : '')}
+        class={'key' + (p.tone && p.tone !== 'cap' ? ' c-' + p.tone : '') + (p.on ? ' on' : '') + (p.hot ? ' hot' : '') + (p.pulse ? ' pulse' : '')}
         aria-label={p.label} aria-pressed={p.on}
         onClick={() => { if (p.onClick) { press(); p.onClick(); } }}
         onPointerDown={p.onPointerDown} onPointerMove={p.onPointerMove} onPointerUp={p.onPointerUp} onPointerCancel={p.onPointerUp}
       >
-        <Icon n={p.icon} size={21} />
+        <Icon n={p.icon} size={22} stroke={1.9} />
         {p.badge ? <span class="badge">{p.badge}</span> : null}
       </button>
       <span class="legend-s">{p.label}</span>

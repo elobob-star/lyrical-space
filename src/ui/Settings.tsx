@@ -1,6 +1,6 @@
 import { useRef } from 'preact/hooks';
 import { importBackup, liveSongs, scraps, setSetting, settings, songs } from '../store/state';
-import { Paper } from '../store/models';
+import { Chassis, Paper } from '../store/models';
 import { layer, say } from '../store/ui';
 import { backupJson } from '../engine/export';
 import { shareFile } from '../engine/share';
@@ -23,9 +23,15 @@ export function Settings() {
   const file = useRef<HTMLInputElement>(null);
   return (
     <Sheet title={`DIP SWITCHES · MK-I v${version}`} onClose={close}>
-      <div class="grp">PAPER STOCK</div>
+      <div class="grp">CHASSIS FINISH</div>
       <div class="seg">
-        {(['newsprint', 'graph', 'midnight'] as Paper[]).map((p) => (
+        {(['alu', 'charcoal'] as Chassis[]).map((c) => (
+          <button key={c} class={st.chassis === c ? 'on' : ''} onClick={() => { feel('click'); setSetting('chassis', c); }}>{c === 'alu' ? 'ALUMINIUM' : 'CHARCOAL'}</button>
+        ))}
+      </div>
+      <div class="grp">PAPER STOCK</div>
+      <div class="seg" style={{ flexWrap: 'wrap' }}>
+        {(['newsprint', 'legal', 'graph', 'midnight'] as Paper[]).map((p) => (
           <button key={p} class={st.paper === p ? 'on' : ''} onClick={() => { feel('click'); setSetting('paper', p); }}>{p.toUpperCase()}</button>
         ))}
       </div>

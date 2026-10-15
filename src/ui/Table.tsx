@@ -5,14 +5,12 @@ import { ID, Strip, sectionNames, uid } from '../store/models';
 import { feel, haptic, sound } from '../engine/feel';
 import { freeSpot, makeStrips, sendTextToBench } from '../store/actions';
 import { indexAtPoint } from '../engine/hit';
-import { say } from '../store/ui';
+import { say, tableTool } from '../store/ui';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
 import { Choices, Sheet, TextSheet } from './Sheet';
 import { setMode } from './Bezel';
 
-type Tool = null | 'snip' | 'tape';
-export const tableTool = signal<Tool>(null);
 const selected = signal<ID | null>(null);
 const taped = signal<ID | null>(null);
 const sheetState = signal<null | { kind: 'edit' | 'new'; id?: ID } | { kind: 'bench'; id: ID } | { kind: 'join'; a: ID; b: ID }>(null);
@@ -25,6 +23,8 @@ function stripRemove(id: ID): Strip | null {
 }
 
 function restoreStrip(s: Strip) { updateCurrent((d) => { d.table.push(s); }); }
+
+const hashId = (id: string) => [...id].reduce((a, c) => a + c.charCodeAt(0), 0) % 4;
 
 export function dealFromScraps(): number {
   const song = currentSong.value;
@@ -166,7 +166,7 @@ export function TableView() {
           const x = d ? d.x : s.x, y = d ? d.y : s.y;
           return (
             <div key={s.id}
-              class={'strip' + (sel === s.id ? ' sel' : '') + (taped.value === s.id ? ' taped' : '') + (d ? ' dragging' : '') + (tool === 'snip' ? ' snippable' : '') + (s.from === 'splice' ? ' spliced' : '')}
+              class={'strip n' + hashId(s.id) + ' f-' + s.from + (sel === s.id ? ' sel' : '') + (taped.value === s.id ? ' taped' : '') + (d ? ' dragging' : '') + (tool === 'snip' ? ' snippable' : '') + (s.from === 'splice' ? ' spliced' : '')}
               style={{ left: `${x * 100}%`, top: `${y * 100}%`, zIndex: d ? 999 : s.z, transform: `rotate(${s.rot}deg)${d ? ' scale(1.04)' : ''}` }}
               onPointerDown={(e) => onDown(e as any, s)} onPointerMove={onMove as any} onPointerUp={(e) => onUp(e as any, s)} onPointerCancel={() => { info.current = null; setDrag(null); }}
               onClick={(e) => onClickSnip(e as any, s)}>
@@ -264,10 +264,10 @@ export function TableKeys() {
   const tool = tableTool.value;
   return (
     <Keys>
-      <Key icon="strip" label="+Strip" sound="thock" onClick={() => (sheetState.value = { kind: 'new' })} />
-      <Key icon="scissors" label="Snip" on={tool === 'snip'} led="orange" onClick={() => { tableTool.value = tool === 'snip' ? null : 'snip'; taped.value = null; selected.value = null; }} />
-      <Key icon="tape" label="Tape" on={tool === 'tape'} led="orange" onClick={() => { tableTool.value = tool === 'tape' ? null : 'tape'; taped.value = null; selected.value = null; }} />
-      <Key icon="shuffle" label="Shuffle" sound="ratchet" onClick={() => {
+      <Key icon="strip" label="+Strip" tone="cap" sound="thock" onClick={() => (sheetState.value = { kind: 'new' })} />
+      <Key icon="scissors" label="Snip" tone="blue" on={tool === 'snip'} led="orange" onClick={() => { tableTool.value = tool === 'snip' ? null : 'snip'; taped.value = null; selected.value = null; }} />
+      <Key icon="tape" label="Tape" tone="green" on={tool === 'tape'} led="orange" onClick={() => { tableTool.value = tool === 'tape' ? null : 'tape'; taped.value = null; selected.value = null; }} />
+      <Key icon="shuffle" label="Shuffle" tone="yellow" sound="ratchet" onClick={() => {
         updateCurrent((d) => {
           const out: Strip[] = [];
           for (const s of d.table) {

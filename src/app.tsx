@@ -75,7 +75,7 @@ export function App() {
   const order = { roll: 0, table: 1, bench: 2 } as const;
 
   return (
-    <div class={'chassis' + (keyboardOpen.value ? ' kb-open' : '')} data-paper={st.paper} data-ts={st.textSize} data-grain={st.grain ? 'on' : 'off'}>
+    <div class={'chassis' + (keyboardOpen.value ? ' kb-open' : '')} data-paper={st.paper} data-chassis={st.chassis} data-ts={st.textSize} data-grain={st.grain ? 'on' : 'off'}>
       <Bezel />
       <div class="screen">
         <div class="paper-bg" />
@@ -93,6 +93,8 @@ export function App() {
         {m === 'table' && <TableKeys />}
         {m === 'bench' && <BenchKeys />}
       </div>
+      <i class="screw" style={{ left: '5px', bottom: 'calc(var(--safe-bottom) + 5px)' }} />
+      <i class="screw" style={{ right: '5px', bottom: 'calc(var(--safe-bottom) + 5px)' }} />
       {layer.value === 'rack' && <Rack />}
       {layer.value === 'settings' && <Settings />}
       {layer.value === 'export' && <ExportSheet />}

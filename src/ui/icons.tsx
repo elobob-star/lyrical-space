@@ -47,10 +47,10 @@ const P: Record<string, JSX.Element> = {
   box: <><path d="M3 8l9-4 9 4v10l-9 4-9-4z" /><path d="M3 8l9 4 9-4M12 12v10" /></>,
 };
 
-export function Icon({ n, size = 20, class: cls }: { n: keyof typeof P | string; size?: number; class?: string }) {
+export function Icon({ n, size = 20, class: cls, stroke = 1.7 }: { n: keyof typeof P | string; size?: number; class?: string; stroke?: number }) {
   return (
     <svg class={'ic ' + (cls ?? '')} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      stroke-width={stroke} stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       {P[n] ?? null}
     </svg>
   );

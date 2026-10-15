@@ -1,16 +1,66 @@
 import { useRef, useState } from 'preact/hooks';
 import { Dial } from './Dial';
 import { Icon } from './icons';
-import { currentSong, mode, saving, setSetting, settings, updateCurrent, Mode } from '../store/state';
-import { layer } from '../store/ui';
+import { currentSong, mode, saving, settings, updateCurrent, Mode } from '../store/state';
+import { grease, latch, layer, rollClock, tableTool } from '../store/ui';
 import { recording } from '../engine/recorder';
 import { feel } from '../engine/feel';
+import { sectionAbbrev, sectionNames } from '../store/models';
 
 const MODES: Mode[] = ['roll', 'table', 'bench'];
-const LABELS = ['ROLL', 'TABLE', 'BENCH'];
+const LABELS: Array<[string, string]> = [['ROLL', 'FREEWRITE'], ['TABLE', 'CUT-UP'], ['BENCH', 'STRUCTURE']];
 
 export function setMode(m: Mode): void {
   mode.value = m;
+}
+
+const clock = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+};
+
+function Readout() {
+  const song = currentSong.value;
+  const m = mode.value;
+  if (!song) return <div class="lcd" />;
+  if (m === 'roll') {
+    const t = song.roll.text;
+    const lines = t.split('\n').filter((l) => l.trim()).length;
+    const words = (t.match(/[\p{L}\p{N}'’]+/gu) ?? []).length;
+    const ck = rollClock.value;
+    return (
+      <div class="lcd" aria-label="Readout">
+        <span class="hot">ROLL</span>
+        <span>{String(lines).padStart(3, '0')}L {String(words).padStart(4, '0')}W</span>
+        <span class="sp" />
+        {latch.value && <span class="hot blink">LATCH</span>}
+        {grease.value && <span class="hot">PEN</span>}
+        <span class={ck !== null ? 'hot' : 'dim'}>{clock(ck ?? 0)}</span>
+      </div>
+    );
+  }
+  if (m === 'table') {
+    const n = song.table.length;
+    const tool = tableTool.value;
+    return (
+      <div class="lcd" aria-label="Readout">
+        <span class="hot">TABLE</span>
+        <span>{String(n).padStart(2, '0')} STRIP{n === 1 ? '' : 'S'}</span>
+        <span class="sp" />
+        {tool && <span class="hot blink">{tool === 'snip' ? 'SNIP' : 'TAPE'}</span>}
+      </div>
+    );
+  }
+  const names = sectionNames(song);
+  const map = song.arrangement.map((a) => { const s = song.sections.find((x) => x.id === a.sectionId); return s ? sectionAbbrev(s, names) : ''; }).join(' ');
+  return (
+    <div class="lcd" aria-label="Readout">
+      <span class="hot">BENCH</span>
+      <span class="dim">{map || '—'}</span>
+      <span class="sp" />
+      <span>{song.bpm}{song.key ? ' ' + song.key : ''}</span>
+    </div>
+  );
 }
 
 export function Bezel() {
@@ -30,8 +80,8 @@ export function Bezel() {
   const dial = (
     <div class="dial-wrap">
       <div class="legend">
-        {LABELS.map((l, i) => (
-          <button class={i === idx ? 'on' : ''} onClick={() => { feel('click'); setMode(MODES[i]); }}>{l}</button>
+        {LABELS.map(([l, sub], i) => (
+          <button class={i === idx ? 'on' : ''} onClick={() => { feel('click'); setMode(MODES[i]); }}><b>{l}</b><small>{sub}</small></button>
         ))}
       </div>
       <Dial value={idx} onChange={(i) => setMode(MODES[i])} />
@@ -40,7 +90,7 @@ export function Bezel() {
   const reel = (
     <button class={'reel-btn' + (spin ? ' spin' : '')} aria-label="Open tape rack"
       onClick={() => { feel('thock'); setSpin(true); setTimeout(() => setSpin(false), 650); layer.value = 'rack'; }}>
-      <Icon n="reel" size={24} />
+      <Icon n="reel" size={26} stroke={1.8} />
     </button>
   );
   const tape = (
@@ -50,7 +100,7 @@ export function Bezel() {
         <input ref={inp} defaultValue={song?.title ?? ''} maxLength={60} onBlur={finish}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
       ) : (
-        <span class="t">{song?.title ?? '—'}</span>
+        <><span class="t">{song?.title ?? '—'}</span><Icon n="edit" size={12} class="edit" /></>
       )}
     </button>
   );
@@ -58,20 +108,20 @@ export function Bezel() {
   const rec = recording.value;
   return (
     <div class="bezel-top">
+      <i class="screw" style={{ left: '5px', top: 'calc(var(--safe-top) + 5px)' }} />
+      <i class="screw" style={{ right: '5px', top: 'calc(var(--safe-top) + 5px)' }} />
       <div class="nameplate" role="button" tabIndex={0} onClick={() => { feel('click'); layer.value = 'settings'; }}>
         <span class={'led on ' + (rec ? 'red blink' : saving.value ? 'amber' : 'green')} />
-        <b>PORTASCRIBE</b> <span>MK-I</span>
+        <b>PORTASCRIBE</b><span class="mk">MK-I</span>
         <span class="grow" />
-        <span>{rec ? 'REC' : settings.value.paper.toUpperCase()}</span>
-        <Icon n="gear" size={11} />
+        <span class="grill" />
+        <Icon n="gear" size={13} />
       </div>
       <div class="bezel-row" style={{ flexDirection: lh ? 'row-reverse' : 'row' }}>
         {reel}
-        {tape}
+        <div class="mid">{tape}<Readout /></div>
         {dial}
       </div>
     </div>
   );
 }
-
-export { setSetting };
