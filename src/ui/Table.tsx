@@ -250,7 +250,7 @@ export function TableView() {
         })}
         {selStrip && (
           <div class="strip-actions" style={{
-            left: `${Math.max(2, Math.min(52, selStrip.x * 100))}%`,
+            left: `clamp(4px, ${selStrip.x * 100}%, calc(100% - 232px))`,
             top: selStrip.y > 0.12 ? `calc(${selStrip.y * 100}% - 48px)` : `calc(${selStrip.y * 100}% + 64px)`, zIndex: 1000,
           }}>
             <button onClick={() => { sheetState.value = { kind: 'edit', id: selStrip.id }; }}><Icon n="edit" size={14} />EDIT</button>

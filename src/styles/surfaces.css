@@ -386,12 +386,14 @@
 .stand::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: var(--grain); background-size: 220px; opacity: .6; }
 .stand-progress { position: absolute; left: 0; right: 0; top: 0; height: 3px; z-index: 3; padding-top: var(--safe-top); box-sizing: content-box; }
 .stand-progress i { display: block; height: 3px; background: var(--accent); transform-origin: 0 50%; transform: scaleX(0); }
-.stand-head { position: relative; z-index: 2; display: flex; align-items: center; gap: 10px; padding: calc(var(--safe-top) + 12px) 14px 10px 18px; border-bottom: 1.5px solid var(--rule-strong); transition: opacity .3s, transform .3s var(--ease-out); }
+.stand-head { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 6px; padding: calc(var(--safe-top) + 10px) 14px 9px 18px; border-bottom: 1.5px solid var(--rule-strong); transition: opacity .3s, transform .3s var(--ease-out); }
+.st-top, .st-sub { display: flex; align-items: center; gap: 7px; }
+.st-name { flex: 1; min-width: 0; font: 700 17px var(--font-type); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-sub small { font: 700 8.5px var(--font-ui); letter-spacing: .16em; color: var(--ink-2); }
+.stand .tog { color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.stand .tog.on { color: var(--paper); background: var(--ink); box-shadow: none; }
 .stand-head.hide, .stand-ctl.hide { opacity: 0; pointer-events: none; }
 .stand-head.hide { transform: translate3d(0, -10px, 0); }
-.st-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.st-title b { font: 700 17px var(--font-type); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.st-title small { font: 700 8.5px var(--font-ui); letter-spacing: .16em; color: var(--ink-2); }
 .stand-body { position: relative; z-index: 1; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .stand-body::-webkit-scrollbar { display: none; }
 .stand-sheet { padding: 22px 18px 55vh; font: 400 var(--stand-ts, 20px)/1.35 var(--font-type); max-width: 760px; margin: 0 auto; }

@@ -79,6 +79,13 @@ export interface Scrap {
   kind?: string;
 }
 
+/** "CAUGHT 3D AGO" / "CUT FROM BORROWED ROOM" — the little stamp on a scrap. */
+export function provenance(s: Scrap, titleOf: (id?: ID) => string | undefined, ago: (t: number) => string): string {
+  const t = titleOf(s.songId);
+  if (s.from === 'catch' || !t) return `${s.from === 'cut' ? 'CUT' : s.from === 'table' ? 'KEPT' : 'CAUGHT'} ${ago(s.createdAt)}`;
+  return `${s.from === 'cut' ? 'CUT FROM' : s.from === 'table' ? 'KEPT FROM' : 'FROM'} ${t.toUpperCase()}`;
+}
+
 export function normalizeScrap(s: Scrap): Scrap {
   if (s.from) return s;
   const { kind, ...rest } = s;

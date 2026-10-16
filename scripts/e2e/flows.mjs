@@ -134,7 +134,9 @@ await shot('21-table-snip');
 // tape: drop a strip right under another one
 await page.mouse.click(5, 300); // nothing
 const all = page.locator('.strip');
-const A = all.nth(0), B = all.nth(1);
+// tape onto the highest strip so there is room underneath it
+const ids = await all.evaluateAll((els) => els.map((e) => ({ id: e.dataset.id, top: e.getBoundingClientRect().top })).sort((a, b) => a.top - b.top).map((x) => x.id));
+const A = page.locator(`.strip[data-id="${ids[0]}"]`), B = page.locator(`.strip[data-id="${ids[ids.length - 1]}"]`);
 const ab = await A.boundingBox(), bb = await B.boundingBox();
 const nBeforeTape = await all.count();
 await drag(bb.x + 10, bb.y + 6, ab.x + 10 + 4, ab.y + ab.height + 6, 16);

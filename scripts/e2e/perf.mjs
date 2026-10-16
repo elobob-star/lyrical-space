@@ -32,7 +32,7 @@ await page.waitForTimeout(500);
 await measure('type 120 chars (long roll)', async () => { await page.keyboard.type('abcdefghij'.repeat(12), { delay: 0 }); return 120; });
 // 2) table drag
 await page.click('.legend button:nth-child(2)'); await page.waitForTimeout(400);
-for (let i = 0; i < 3; i++) { const k = page.locator('.lever-knob'); const b = await k.boundingBox(); await page.mouse.move(b.x + 15, b.y + 15); await page.mouse.down(); await page.mouse.move(b.x + 15, b.y + 170, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(300); }
+for (let i = 0; i < 3; i++) { await page.click('.bezel-bottom button[aria-label="Deal"]'); await page.waitForTimeout(400); }
 const s = page.locator('.strip').first(); const sb = await s.boundingBox();
 await measure('drag strip (200 moves)', async () => { await page.mouse.move(sb.x + 20, sb.y + 15); await page.mouse.down(); await page.mouse.move(sb.x + 200, sb.y + 400, { steps: 200 }); await page.mouse.up(); return 200; });
 // 3) dial drag

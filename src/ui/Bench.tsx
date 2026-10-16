@@ -163,7 +163,7 @@ function LineMenu() {
   if (!sec || !line) return null;
   const info = lineInfo(line.text, line.meter);
   return (
-    <Sheet title={`LINE · ${info.syl}σ`} onClose={close}>
+    <Sheet title={`LINE · ${info.syl} SYL`} onClose={close}>
       <div class="stressline">{line.text.trim() ? stressWords(info.stress) : 'EMPTY LINE'}</div>
       <div class="choices">
         <button class="choice" onClick={() => { moveLine(song.id, sec.id, line.id, -1); close(); }}><span>↑ MOVE UP</span></button>

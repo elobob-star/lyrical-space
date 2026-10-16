@@ -3,7 +3,7 @@ import {
   addScrap, binSong, createSong, currentId, duplicateSong, liveSongs, mode, purgeSong, putBackScrap, removeScrap, restoreSong,
   restoreVersion, scraps, songs, updateCurrent, updateScrap, updateSong, flushAll,
 } from '../store/state';
-import { INKS, INK_NAMES, ID, Line, Scrap, Song, activeTake, lineCount, newSection, uid } from '../store/models';
+import { INKS, INK_NAMES, ID, Line, Song, activeTake, lineCount, newSection, provenance, uid } from '../store/models';
 import { layer, rackTab, say } from '../store/ui';
 import { feel } from '../engine/feel';
 import { makeStrips } from '../store/actions';
@@ -133,8 +133,6 @@ function TapeMenu({ id, onClose }: { id: ID; onClose: () => void }) {
   );
 }
 
-const FROM: Record<string, string> = { catch: 'CAUGHT', cut: 'CUT FROM', table: 'FROM THE TABLE OF', roll: 'FROM THE ROLL OF' };
-
 function Shoebox({ q }: { q: string }) {
   const list = scraps.value.filter((s) => !q || s.text.toLowerCase().includes(q));
   const [add, setAdd] = useState('');
@@ -142,10 +140,6 @@ function Shoebox({ q }: { q: string }) {
   const editing = scraps.value.find((s) => s.id === edit);
   const titleOf = (id?: ID) => songs.value.find((x) => x.id === id)?.title;
   const catchIt = () => { if (add.trim()) { addScrap(add, 'catch'); setAdd(''); feel('chk'); } };
-  const prov = (s: Scrap) => {
-    const t = titleOf(s.songId);
-    return s.from === 'catch' || !t ? `${s.from === 'catch' ? 'CAUGHT' : FROM[s.from]?.split(' ')[0] ?? 'CAUGHT'} ${ago(s.createdAt)}` : `${FROM[s.from]} ${t}`;
-  };
   return (
     <div class="shoebox">
       <form class="catch-row" onSubmit={(e) => { e.preventDefault(); catchIt(); }}>
@@ -157,7 +151,7 @@ function Shoebox({ q }: { q: string }) {
         <div class="slip" key={s.id}>
           <button class="slip-txt" onClick={() => setEdit(s.id)}>{s.text}</button>
           <div class="slip-foot">
-            <span class="prov">{prov(s)}{s.used ? ` · DRAWN ${s.used}×` : ''}</span>
+            <span class="prov">{provenance(s, titleOf, ago)}{s.used ? ` · DRAWN ${s.used}×` : ''}</span>
             <span class="grow" />
             <button aria-label="Write from it on the Roll" onClick={() => {
               updateCurrent((d) => { d.roll.spark = s.text; });

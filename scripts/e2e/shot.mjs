@@ -13,6 +13,6 @@ await page.waitForTimeout(600);
 await page.screenshot({ path: `${out}/01-roll.png` });
 await page.click('.legend button:nth-child(2)');
 await page.waitForTimeout(400);
-await page.screenshot({ path: `${out}/02-table-empty.png` });
+await page.screenshot({ path: `${out}/02-table.png` });
 console.log(errors.join('\n') || 'no errors');
 await browser.close();

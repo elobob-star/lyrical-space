@@ -139,6 +139,7 @@ export function App() {
       <div class="bezel-bottom" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.key')) e.preventDefault(); }}>
         {rack ? <RackKeys /> : m === 'roll' ? <RollKeys /> : m === 'table' ? <TableKeys /> : <BenchKeys />}
       </div>
+      <div id="overlays" />
       {ly === 'settings' && <Settings />}
       {ly === 'export' && <ExportSheet />}
       {ly === 'stand' && <Stand />}

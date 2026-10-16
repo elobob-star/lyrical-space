@@ -1,8 +1,8 @@
 import { useState } from 'preact/hooks';
-import { currentSong, putBackScrap, removeScrap, scraps, updateScrap } from '../../store/state';
+import { currentSong, putBackScrap, removeScrap, scraps, songs, updateScrap } from '../../store/state';
 import { MODIFIERS, diatonic, keyName, modifyChord, parseKey } from '../../engine/music';
 import { focused, addLineAfter, focusLine, setLineText } from '../../store/lines';
-import { activeTake } from '../../store/models';
+import { activeTake, provenance } from '../../store/models';
 import { lineInfo, tokenize, wordInfo } from '../../engine/words';
 import { rhymeKey } from '../../engine/phones';
 import { diffEdit } from '../../engine/textdiff';
@@ -95,7 +95,10 @@ export function insertScrap(text: string): void {
   }
 }
 
-const FROM: Record<string, string> = { catch: 'CAUGHT', cut: 'CUT', table: 'TABLE', roll: 'ROLL' };
+const agoShort = (t: number) => {
+  const h = Math.floor((Date.now() - t) / 3_600_000);
+  return h < 1 ? 'JUST NOW' : h < 24 ? `${h}H AGO` : `${Math.floor(h / 24)}D AGO`;
+};
 
 /** The Shoebox, opened over the Bench: MATCH ranks scraps by rhyme with the line above and fit to this line's length. */
 export function ShoeboxTray() {
@@ -133,7 +136,7 @@ export function ShoeboxTray() {
           <div class="scrap-row" key={b.id}>
             <button class="scrap-txt" onClick={() => { insertScrap(b.text); updateScrap(b.id, { used: b.used + 1 }); feel('chk', 'medium'); }}>
               <span>{b.text}</span>
-              <small>{info.syl}σ{rhymes ? ' · RHYMES' : ''} · {FROM[b.from] ?? 'CAUGHT'}{b.songId && b.songId !== song?.id ? ' ELSEWHERE' : ''}</small>
+              <small>{info.syl}σ{rhymes ? ' · RHYMES' : ''} · {b.songId === song?.id && b.from !== 'catch' ? 'FROM THIS SONG' : provenance(b, (id) => songs.peek().find((x) => x.id === id)?.title, agoShort)}</small>
             </button>
             <button class="scrap-x" aria-label="Remove from the shoebox" onClick={() => { const copy = b; removeScrap(b.id); say('SCRAP THROWN AWAY', { label: 'UNDO', run: () => putBackScrap(copy) }); }}><Icon n="close" size={12} /></button>
           </div>

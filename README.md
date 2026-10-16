@@ -1,23 +1,27 @@
-# PORTASCRIBE // MK-I
+# PORTASCRIBE // MK-II
 
-A lyric notepad that behaves like a piece of studio hardware — a Teenage-Engineering-style
-chassis wrapped around three very physical writing surfaces:
+A lyric notepad that behaves like a piece of studio hardware — a matte, Teenage-Engineering-style machine
+wrapped around warm, imperfect paper. Built to beat perfectionism, not to write for you.
 
-| Dial position | Surface | Technique it borrows |
-|---|---|---|
-| **ROLL** | spiral-bound tear-off pad | Kerouac / Dylan stream-of-consciousness freewriting. A **forward latch** turns backspace into *ghost ink*; a **grease pencil** harvests the gems; **PUNCH** sends them to the table. |
-| **TABLE** | cork board of sticky notes | Bowie / Waits cut-ups. **Snip**, **tape**, **shuffle**, pull the **deal lever** for random fragments. |
-| **BENCH** | ruled index cards | Cohen / Nick Drake structure. Verses & choruses, **takes**, **chord stamps**, **rhyme heat map**, syllable gutter, boneyard, cadence pad, loop recorder. |
+| Dial | Surface | Keys | Borrowed from |
+|---|---|---|---|
+| **ROLL** | one long scroll of continuous-form paper | LATCH · PEN · DRAW · PUNCH · SPRINT | Kerouac / Dylan: freewrite. Backspace strikes finished words through (the word you're typing still erases). LATCH = forward only, with a bail that folds the past away. PEN taps the gems, PUNCH sends them to the Table. |
+| **TABLE** | a cutting mat with paper strips | SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP | Bowie / Burroughs / Waits: tap a strip then a gap to snip, drop one on another's edge to tape, deal scraps from the shoebox, cut everything up. |
+| **BENCH** | ruled index cards | WORDS · CHORDS · LENS · SHOEBOX · STAND | Cohen / Nick Drake: sections and takes, chord stamps, rhyme & meter lenses, hold-to-hum per card, tuning/capo/tempo, a scratch tape, and a music stand that scrolls at tempo. |
 
-Offline-first, no accounts, **no API keys**. Rhymes/syllables use a bundled CMU dictionary; Datamuse and the
-Free Dictionary API are optional extras for associations and definitions.
+**⏏ TAPES** opens the rack: cassette J-cards, the **Shoebox** (one pile for every stray line), the bin, tape history,
+and **PASTE IN** (plain lyrics, chords-over-lyrics or ChordPro). The **CATCH** slip on the right edge files a line
+into the shoebox from anywhere. The **LCD** is the machine's only voice — tap it to UNDO or follow a hint.
+
+Offline-first, no accounts, **no API keys**, no AI. Rhymes, syllables and stress come from a bundled CMU dictionary;
+Datamuse and the Free Dictionary API are optional extras.
 
 Full product spec: [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Stack
 
 Vite + TypeScript + Preact (signals, immer) → plain CSS/SVG UI → **Capacitor 8** → Android APK.
-The same build also runs as a web page / PWA.
+The same build runs as a web page / PWA.
 
 ## Develop
 
@@ -26,6 +30,14 @@ npm install
 npm run dev          # http://localhost:5173 — use a phone-sized viewport
 npm test             # engine unit tests (vitest)
 npm run build        # type-check + production bundle in dist/
+```
+
+Browser checks (need the dev server running; Chromium via Playwright):
+
+```bash
+node scripts/e2e/flows.mjs out/     # ~70 interactions across every surface
+node scripts/e2e/tour.mjs out/      # screenshots of every surface
+node scripts/e2e/sheets.mjs out/    # screenshots of every sheet, light and dark
 ```
 
 Regenerate the pronunciation data (only needed if you change `scripts/build-cmu.mjs`): `npm run cmu`.
@@ -50,4 +62,4 @@ builds one on every push.
 ## Credits
 
 CMU Pronouncing Dictionary · SUBTLEX-US frequencies (via `subtlex-word-frequencies`) · Datamuse API ·
-Free Dictionary API · Space Mono, Courier Prime, Special Elite, Caveat, Doto, Barlow Condensed (SIL OFL).
+Free Dictionary API · Space Grotesk, Courier Prime, Doto (SIL OFL).

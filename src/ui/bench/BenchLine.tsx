@@ -8,7 +8,7 @@ import { WordMeter, nextMeter } from '../../engine/words';
 import {
   focusReq, focused, mergeUp, pasteLines, placeChord, removeChord, removeLine, setLineText, splitLine, focusLine,
 } from '../../store/lines';
-import { updateSong } from '../../store/state';
+import { currentSong, updateSong } from '../../store/state';
 import { cutLine } from '../../store/actions';
 import { feel, haptic } from '../../engine/feel';
 import { Lens, say } from '../../store/ui';
@@ -106,21 +106,27 @@ export const LineRow = memo(function LineRow(p: LineProps) {
     focusReq.value = null;
   }), [line.id]);
 
+  /** the stored text right now — several input events can land between renders */
+  const liveText = () => {
+    const sec = currentSong.peek()?.sections.find((x) => x.id === p.sid);
+    return (sec && activeTake(sec).lines.find((l) => l.id === line.id)?.text) ?? line.text;
+  };
   const onInput = (e: Event) => {
     const el = e.target as HTMLTextAreaElement;
     let nv = el.value;
+    const was = liveText();
     if (nv.includes('\n')) {
       // soft keyboards that insert a raw newline instead of an Enter key event
       const i = nv.indexOf('\n');
       const caret = (el.selectionStart ?? nv.length) - 1;
       nv = nv.replace(/\n/g, '');
       el.value = nv;
-      setLineText(p.songId, p.sid, line.id, nv, diffEdit(line.text, nv));
+      setLineText(p.songId, p.sid, line.id, nv, diffEdit(was, nv));
       splitLine(p.songId, p.sid, line.id, Math.min(i, nv.length), Math.min(Math.max(caret, i), nv.length));
       return;
     }
-    if (nv === line.text) return;
-    setLineText(p.songId, p.sid, line.id, nv, diffEdit(line.text, nv, el.selectionStart ?? undefined));
+    if (nv === was) return;
+    setLineText(p.songId, p.sid, line.id, nv, diffEdit(was, nv, el.selectionStart ?? undefined));
   };
 
   const neighbor = (id?: ID, end = false) => { if (id) focusLine(id, end ? 9999 : 0); };
