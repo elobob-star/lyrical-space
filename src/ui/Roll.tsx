@@ -1,11 +1,12 @@
 import { signal } from '@preact/signals';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { currentSong, drawScraps, setSetting, settings, updateCurrent } from '../store/state';
-import { Mark, uid } from '../store/models';
+import { currentSong, drawScraps, scraps, setSetting, settings, updateCurrent } from '../store/state';
+import { currentPage, flip, hasWords, pageId, pages, pendingMarks, punchPage, turnPage, updatePage } from '../store/notebook';
+import { Mark, Page, uid } from '../store/models';
 import { diffEdit, rebaseMarks } from '../engine/textdiff';
 import { indexAtPoint } from '../engine/hit';
 import { feel, haptic, sound } from '../engine/feel';
-import { punchPencil, pendingPencil } from '../store/actions';
+import { makeStrips } from '../store/actions';
 import { hintOnce, latch, pen, rollStats, say, sprint } from '../store/ui';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
@@ -150,17 +151,18 @@ function flyPunched(root: HTMLElement | null): void {
 }
 
 export function RollView() {
-  const song = currentSong.value!;
-  const text = song.roll.text;
-  const marks = song.roll.marks;
+  const page = currentPage.value!;
+  const text = page.text;
+  const marks = page.marks;
   const st = settings.value;
   const ta = useRef<HTMLTextAreaElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLSpanElement>(null);
-  const lastSong = useRef(song.id);
-  /** live roll state: handlers can fire several times between renders, so never trust the render closure */
-  const live = () => currentSong.peek()!.roll;
+  const lastPage = useRef(page.id);
+  /** live page state: handlers can fire several times between renders, so never trust the render closure */
+  const live = () => currentPage.peek()!;
+  const write = (recipe: (d: Page) => void) => updatePage(currentPage.peek()!.id, recipe);
   /** the word still being typed: backspace may really erase it (typo grace) */
   const wet = useRef<{ s: number; e: number } | null>(null);
   const [preview, setPreviewState] = useState<[number, number] | null>(null);
@@ -170,8 +172,8 @@ export function RollView() {
   const g = pen.value;
   const lt = latch.value;
 
-  if (lastSong.current !== song.id) { lastSong.current = song.id; wet.current = null; }
-  useEffect(() => { hintOnce('roll', 'THE ROLL — TYPE FAST. BACKSPACE STRIKES THROUGH, IT NEVER ERASES'); }, []);
+  if (lastPage.current !== page.id) { lastPage.current = page.id; wet.current = null; }
+  useEffect(() => { hintOnce('notebook', 'THE NOTEBOOK — JUST RAMBLE. BACKSPACE STRIKES THROUGH, IT NEVER ERASES'); }, []);
 
   // the mirror is in normal flow (it defines the page height); the textarea simply overlays it.
   useEffect(() => {
@@ -193,7 +195,7 @@ export function RollView() {
     };
     const t = setTimeout(calc, rollStats.peek().words === 0 && rollStats.peek().lines === 0 ? 0 : 220);
     return () => clearTimeout(t);
-  }, [text, song.id]);
+  }, [text, page.id]);
 
   // ----- forward latch: carriage only moves forward; a paper bail folds away everything but the last two lines -----
   useLayoutEffect(() => {
@@ -202,7 +204,7 @@ export function RollView() {
     if (!el || !sheet) return;
     const lh = parseFloat(getComputedStyle(sheet).lineHeight) || 27;
     const top = el.offsetTop; // the end marker sits on the caret's line (the latch pins the caret to the end)
-    setBail(Math.max(0, top - lh * 2 + 6));
+    setBail(Math.max(0, top - lh * 2 - 3)); // the current line and the two before it stay in view
     const sc = scroller.current;
     if (sc && document.activeElement === ta.current) {
       const want = top - sc.clientHeight * 0.45;
@@ -223,7 +225,7 @@ export function RollView() {
   }, [lt]);
 
   const commit = (nt: string, nm: Mark[], caret?: number) => {
-    updateCurrent((d) => { d.roll.text = nt; d.roll.marks = nm; });
+    write((d) => { d.text = nt; d.marks = nm; });
     if (caret !== undefined) {
       const el = ta.current;
       if (el) { el.value = nt; el.setSelectionRange(caret, caret); }
@@ -364,28 +366,28 @@ export function RollView() {
     };
     const finish = () => {
       clearTimeout(timer); stopAuto();
-      const cur = currentSong.peek();
+      const cur = currentPage.peek();
       if (!cur) return;
       if (active) {
         const p = pv.current;
         if (p && p[1] > p[0]) {
-          updateCurrent((d) => {
-            const [a, b] = snapWords(d.roll.text, p[0], p[1]);
-            d.roll.marks.push({ id: uid(), s: a, e: b, kind: 'pencil' });
-            d.roll.marks = mergePencils(d.roll.marks);
+          write((d) => {
+            const [a, b] = snapWords(d.text, p[0], p[1]);
+            d.marks.push({ id: uid(), s: a, e: b, kind: 'pencil' });
+            d.marks = mergePencils(d.marks);
           });
           feel('click', 'light');
         }
         setPreview(null);
       } else if (down && !moved) {
         const o = offsetAt(down.x, down.y);
-        const hit = cur.roll.marks.find((m) => m.kind === 'pencil' && o >= m.s && o <= m.e);
+        const hit = cur.marks.find((m) => m.kind === 'pencil' && o >= m.s && o <= m.e);
         if (hit?.punched) { say('ALREADY PUNCHED OUT'); }
-        else if (hit) { updateCurrent((d) => { d.roll.marks = d.roll.marks.filter((m) => m.id !== hit.id); }); feel('click', 'light'); }
+        else if (hit) { write((d) => { d.marks = d.marks.filter((m) => m.id !== hit.id); }); feel('click', 'light'); }
         else {
-          const ph = phraseAt(cur.roll.text, Math.min(o, cur.roll.text.length - 1));
+          const ph = phraseAt(cur.text, Math.min(o, cur.text.length - 1));
           if (ph) {
-            updateCurrent((d) => { d.roll.marks.push({ id: uid(), s: ph[0], e: ph[1], kind: 'pencil' }); d.roll.marks = mergePencils(d.roll.marks); });
+            write((d) => { d.marks.push({ id: uid(), s: ph[0], e: ph[1], kind: 'pencil' }); d.marks = mergePencils(d.marks); });
             feel('click', 'light');
           }
         }
@@ -411,7 +413,7 @@ export function RollView() {
       root.removeEventListener('mousedown', ms); window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', finish);
       setPreview(null);
     };
-  }, [g, song.id]);
+  }, [g, page.id]);
 
   useEffect(() => { if (g) ta.current?.blur(); }, [g]);
   useEffect(() => () => { pen.value = false; }, []);
@@ -422,47 +424,113 @@ export function RollView() {
     const pre = !t ? '' : t.endsWith('\n\n') ? '' : t.endsWith('\n') ? '\n' : '\n\n';
     const nt = t + pre + sp + '\n';
     commit(nt, live().marks, nt.length);
-    updateCurrent((d) => { delete d.roll.spark; });
+    write((d) => { delete d.spark; });
     feel('thock');
     pen.value = false;
     setTimeout(() => { const el = ta.current; if (el) { el.focus(); el.setSelectionRange(nt.length, nt.length); } }, 30);
   };
 
+  const list = pages.value;
+  const idx = list.findIndex((p) => p.id === page.id);
+  const prevP = list[idx - 1], nextP = list[idx + 1];
+  const isLatest = !nextP;
+  const go = (dir: -1 | 1) => { if (!(dir < 0 ? prevP : nextP)) { haptic('light'); return; } flipDir = dir; feel('shuffle', 'light'); flip(dir); };
+  const head = useRef<{ x: number; y: number } | null>(null);
+
   return (
     <div class={'mode-view roll' + (g ? ' pen' : '') + (lt ? ' latched' : '')}>
       <div class="roll-scroll" ref={scroller}>
-        {song.roll.spark && (
-          <div class="draw-slip" key={song.roll.spark}>
-            <span class="tape-bit" />
-            <div class="from">FROM THE SHOEBOX</div>
-            <div class="txt">{song.roll.spark}</div>
-            <div class="acts">
-              <button onClick={() => { const n = drawScraps(1, [song.roll.spark!])[0]; if (n) { updateCurrent((d) => { d.roll.spark = n.text; }); feel('ratchet', 'light'); } }}><Icon n="shuffle" size={13} /> ANOTHER</button>
-              <button class="go" onClick={typeSpark}>WRITE FROM IT</button>
-              <button aria-label="Put it back" onClick={() => updateCurrent((d) => { delete d.roll.spark; })}><Icon n="close" size={13} /></button>
+        <div class={'leaf' + (flipDir ? (flipDir < 0 ? ' flip-back' : ' flip-fwd') : '')} key={page.id} onAnimationEnd={() => { flipDir = 0; }}>
+          <div class="pad-gum" aria-hidden="true" />
+          <header class="page-head"
+            onPointerDown={(e) => { head.current = { x: e.clientX, y: e.clientY }; }}
+            onPointerUp={(e) => {
+              const h = head.current; head.current = null;
+              if (h && Math.abs(e.clientX - h.x) > 50 && Math.abs(e.clientX - h.x) > Math.abs(e.clientY - h.y) * 1.5) go(e.clientX > h.x ? -1 : 1);
+            }}>
+            <button class="pg-stamp" aria-label="All pages" onClick={() => { feel('click'); pagesSheet.value = true; }}>
+              <b>{stampDate(page.createdAt)}</b>
+              {page.fromSong && <small>FROM {page.fromSong}</small>}
+            </button>
+            <span class="grow" />
+            <button class="pg-nav" aria-label="Earlier page" disabled={!prevP} onClick={() => go(-1)}><Icon n="left" size={15} stroke={2} /></button>
+            <span class="pg-n">P.{page.n}</span>
+            <button class="pg-nav" aria-label="Later page" disabled={!nextP} onClick={() => go(1)}><Icon n="right" size={15} stroke={2} /></button>
+            <button class="pg-new" aria-label="New page" disabled={isLatest && !hasWords(page) && !page.spark}
+              onClick={() => { flipDir = 1; pen.value = false; feel('tape', 'medium'); const p2 = turnPage(); say(`NEW PAGE · P.${p2.n}`); setTimeout(() => (document.querySelector('.roll-input') as HTMLTextAreaElement | null)?.focus(), 80); }}><Icon n="plus" size={15} stroke={2} /></button>
+          </header>
+          {!isLatest && <div class="pg-older">AN EARLIER PAGE — STILL YOURS TO WRITE ON</div>}
+          {page.spark && (
+            <div class="draw-slip" key={page.spark}>
+              <span class="tape-bit" />
+              <div class="from">FROM THE SHOEBOX</div>
+              <div class="txt">{page.spark}</div>
+              <div class="acts">
+                <button onClick={() => { const n = drawScraps(1, [page.spark!])[0]; if (n) { write((d) => { d.spark = n.text; }); feel('ratchet', 'light'); } }}><Icon n="shuffle" size={13} /> ANOTHER</button>
+                <button class="go" onClick={typeSpark}>WRITE FROM IT</button>
+                <button aria-label="Put it back" onClick={() => write((d) => { delete d.spark; })}><Icon n="close" size={13} /></button>
+              </div>
             </div>
-          </div>
-        )}
-        <div class="roll-sheet">
-          <div class="roll-stack">
-            <div class="roll-mirror" ref={mirror} aria-hidden="true">
-              {text === '' && <span class="ph">Start anywhere. Don't fix anything.{'\n'}Or press DRAW for a line from the shoebox.</span>}
-              {segs.map((s) => (
-                <span data-s={s.s} key={s.s + '-' + s.e}
-                  class={(s.ghost ? 'g ' : '') + (s.pencil ? (s.punched ? 'p done ' : 'p ') : '') + (s.preview ? 'pv' : '')}>
-                  {text.slice(s.s, s.e)}
-                </span>
-              ))}
-              <span ref={end} class="end">{'​'}</span>
+          )}
+          <div class="roll-sheet">
+            <div class="roll-stack">
+              <div class="roll-mirror" ref={mirror} aria-hidden="true">
+                {text === '' && <span class="ph">Start anywhere. Don't fix anything.{'\n'}Or press DRAW for a line from the shoebox.</span>}
+                {segs.map((s) => (
+                  <span data-s={s.s} key={s.s + '-' + s.e}
+                    class={(s.ghost ? 'g ' : '') + (s.pencil ? (s.punched ? 'p done ' : 'p ') : '') + (s.preview ? 'pv' : '')}>
+                    {text.slice(s.s, s.e)}
+                  </span>
+                ))}
+                <span ref={end} class="end">{'\u200b'}</span>
+              </div>
+              <div class="bail" style={{ height: bail + 'px' }} aria-hidden="true"><i /></div>
+              <textarea ref={ta} class="roll-input" value={text} spellcheck={false} autocorrect="off" autocapitalize="sentences"
+                readOnly={g} inputMode={g ? 'none' : 'text'} aria-label="Notebook page"
+                onBeforeInput={onBeforeInput as any} onInput={onInput} onKeyUp={onCaret} onClick={onCaret} />
             </div>
-            <div class="bail" style={{ height: bail + 'px' }} aria-hidden="true"><i /></div>
-            <textarea ref={ta} class="roll-input" value={text} spellcheck={false} autocorrect="off" autocapitalize="sentences"
-              readOnly={g} inputMode={g ? 'none' : 'text'} aria-label="The roll"
-              onBeforeInput={onBeforeInput as any} onInput={onInput} onKeyUp={onCaret} onClick={onCaret} />
           </div>
         </div>
       </div>
+      {pagesSheet.value && <PagesSheet />}
     </div>
+  );
+}
+
+let flipDir: -1 | 0 | 1 = 0;
+const pagesSheet = signal(false);
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+export function stampDate(t: number): string {
+  const d = new Date(t);
+  return `${DAYS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+const words = (t: string) => (t.match(/[\p{L}\p{N}'’]+/gu) ?? []).length;
+
+function PagesSheet() {
+  const close = () => (pagesSheet.value = false);
+  const [q, setQ] = useState('');
+  const needle = q.trim().toLowerCase();
+  const list = [...pages.value].reverse().filter((p) => !needle || p.text.toLowerCase().includes(needle));
+  const cur = currentPage.value?.id;
+  return (
+    <Sheet title={`THE NOTEBOOK · ${pages.value.length} PAGES`} onClose={close}>
+      <input class="field ui" placeholder="search every page…" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+      <div class="list pages-list" style={{ marginTop: '10px' }}>
+        {list.map((p) => {
+          const first = p.text.trim().split('\n').find((l) => l.trim()) ?? '';
+          const hit = needle ? p.text.toLowerCase().indexOf(needle) : -1;
+          const snippet = hit >= 0 ? '…' + p.text.slice(Math.max(0, hit - 24), hit + 48).replace(/\s+/g, ' ') + '…' : first;
+          return (
+            <button class={'li hist' + (p.id === cur ? ' cur' : '')} key={p.id} onClick={() => { flipDir = 0; pageId.value = p.id; close(); feel('click'); }}>
+              <b>P.{p.n} · {stampDate(p.createdAt)}{p.fromSong ? ` · ${p.fromSong}` : ''}</b>
+              <small>{snippet || '— blank —'}{p.text.trim() ? ` · ${words(p.text)} words` : ''}</small>
+            </button>
+          );
+        })}
+        {list.length === 0 && <div class="tray-note">NO PAGE MENTIONS THAT.</div>}
+      </div>
+    </Sheet>
   );
 }
 
@@ -482,8 +550,8 @@ function SprintSheet() {
 }
 
 export function RollKeys() {
-  const song = currentSong.value;
-  const pending = pendingPencil(song);
+  const page = currentPage.value;
+  const pending = pendingMarks(page);
   return (
     <>
       <Keys>
@@ -494,22 +562,23 @@ export function RollKeys() {
             else say('UNLATCHED');
           }} />
         <Key icon="grease" label="Pen" led on={pen.value} pulse={pulsePen.value && !pen.value}
-          onClick={() => { pen.value = !pen.value; pulsePen.value = false; if (pen.value) { latch.value = false; say('PEN — TAP A LINE TO MARK IT · HOLD & DRAG FOR EXACT WORDS'); } }} />
+          onClick={() => { pen.value = !pen.value; pulsePen.value = false; if (pen.value) { latch.value = false; say('PEN — TAP A LINE WORTH KEEPING · HOLD & DRAG FOR EXACT WORDS'); } }} />
         <Key icon="draw" label="Draw" sound="ratchet" onClick={() => {
-          const s = drawScraps(1, song?.roll.spark ? [song.roll.spark] : [])[0];
-          if (!s) { say('THE SHOEBOX IS EMPTY — CATCH A LINE FIRST (TAB ON THE RIGHT)'); return; }
-          updateCurrent((d) => { d.roll.spark = s.text; });
+          const cur = currentPage.peek();
+          if (!cur) return;
+          const s = drawScraps(1, cur.spark ? [cur.spark] : [])[0];
+          if (!s) { say('THE SHOEBOX IS EMPTY — PUNCH OR CATCH A LINE FIRST'); return; }
+          updatePage(cur.id, (d) => { d.spark = s.text; });
           scrollRollTop();
         }} />
         <Key icon="punch" label="Punch" tone="dark" led on={pending > 0} pulse={pending > 0} badge={pending || null} sound={null} onClick={() => {
-          const root = document.querySelector('.roll-mirror') as HTMLElement | null;
-          const n = pendingPencil(currentSong.peek());
-          if (!n) { feel('thud', 'light'); say('NOTHING MARKED — USE THE PEN FIRST'); return; }
-          flyPunched(root);
-          const got = punchPencil();
+          const cur = currentPage.peek();
+          if (!cur || !pendingMarks(cur)) { feel('thud', 'light'); say('NOTHING MARKED — TAP LINES WITH THE PEN FIRST'); return; }
+          flyPunched(document.querySelector('.roll-mirror') as HTMLElement | null);
+          const ids = punchPage(cur);
           feel('punch', 'heavy');
-          if (!got) { say('ONLY STRUCK-OUT INK IN THOSE MARKS'); return; }
-          say(`PUNCHED ${got} → TABLE`, { label: 'GO', run: () => setMode('table') });
+          if (!ids.length) { say('ONLY STRUCK-OUT INK IN THOSE MARKS'); return; }
+          say(`PUNCHED ${ids.length} INTO THE SHOEBOX`, { label: 'ON TABLE', run: () => layOnTable(ids) });
         }} />
         <Key icon="timer" label={sprint.value ? 'Stop' : 'Sprint'} aria="Sprint" led on={!!sprint.value} sound="click"
           onClick={() => { if (sprint.value) stopSprint(); else sprintSheet.value = true; }} />
@@ -517,6 +586,14 @@ export function RollKeys() {
       {sprintSheet.value && <SprintSheet />}
     </>
   );
+}
+
+/** Lay freshly punched scraps straight onto the current song's Table. */
+function layOnTable(ids: string[]): void {
+  const texts = scraps.peek().filter((s) => ids.includes(s.id)).map((s) => s.text);
+  if (!currentSong.peek() || !texts.length) return;
+  updateCurrent((d) => { d.table.push(...makeStrips(texts, 'roll', d.table)); });
+  setMode('table');
 }
 
 function scrollRollTop(): void {

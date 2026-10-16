@@ -36,6 +36,14 @@ drafts per verse), Nick Drake (tunings, a tape running while you write).
 | 6 | **Works in a tunnel** | Writing, syllables, rhymes, meter are 100 % offline (bundled CMU dictionary). Online lookups are a bonus that degrades gracefully. |
 | 7 | **Not a Material app** | No app bar, no hamburger, no FAB, no ripple, no floating toasts. |
 
+### The notebook comes first (MK-II, second pass)
+
+Picking a song before you've written a word is a quiet form of pressure. So the app now opens on a **notebook**
+that belongs to no song: a yellow legal pad, dated pages, cursor ready. You ramble there; lines worth keeping are
+punched into the Shoebox, and songs are built from the Shoebox later. The machine shrank to one slim row
+(⏏ TAPES · LCD · dial) so the paper gets the screen. Songs written in MK-I/MK-II keep their freewrites: each song's
+old roll became a notebook page, stamped with the song's name.
+
 ### What changed from MK-I (and why)
 
 MK-II came out of a design review of MK-I. Most of the review was adopted; where it wasn't, the reason is below.
@@ -59,8 +67,8 @@ MK-II came out of a design review of MK-I. Most of the review was adopted; where
 ### 2.1 The machine
 
 * **Palette** — putty `#DFDBD2` with a 3 % monochrome noise, seams `#B8B3A8` + highlight `#ECE9E2`, silk-screen charcoal `#2B2A28`, one accent: signal orange `#FF4F00`. Charcoal finish mirrors it.
-* **Top bezel** — nameplate row (status LED, `PORTASCRIBE [MK-II]`, grille, SETUP); a seam; then `[⏏ TAPES key] [label-maker title strip / LCD] [printed legend + mode dial]`.
-* **LCD** — the only dark element. Dot-matrix (Doto). Idle readouts: Roll `066 LINES · FWD · PEN · 09:41`; Table `07 STRIPS`; Bench `V1 C V2 C · RHY · 84 G`; Rack `TAPE RACK 12`; while recording `● REC ▮▮▮▯`. Messages scroll past like a marquee; an action (`UNDO`, `GO`, `PEN`) sits on the right — tap the glass to run it.
+* **Top bezel** — one slim row: `[⏏ TAPES key] [LCD] [printed legend NOTEBOOK / TABLE / BENCH + mode dial]`. The song title lives on the paper (typed at the top of the Bench, a scrap of masking tape on the Table). SETUP sits in the Tape Rack.
+* **LCD** — the only dark element. Dot-matrix (Doto). Idle readouts: Notebook `P.38 16 OCT · FWD · PEN · 09:41`; Table `BORROWED ROOM 07`; Bench `V1 C V2 C · RHY · 84 G`; Rack `TAPE RACK 12`; while recording `● REC ▮▮▮▯`. Messages scroll past like a marquee; an action (`UNDO`, `GO`, `PEN`) sits on the right — tap the glass to run it.
 * **Keys** — a dark well, a bone keycap with a 3 px skirt that sinks 2 px on touch-down; LED top-left, 1.5 px technical symbol top-right, label bottom-left. One dark key per surface marks its main action. Five keys per surface. Disabled keys grey out.
 * **Screen well** — paper sits in a shallow tray: 2 px lip, a 2–3 px inner shadow, nothing foggy.
 * **Panels** — sheets and drawers are putty plates that slide up; the scrim never covers the top bezel, so the LCD stays readable.
@@ -69,7 +77,7 @@ MK-II came out of a design review of MK-I. Most of the review was adopted; where
 
 | Surface | Object |
 |---|---|
-| ROLL | continuous-form paper: one long scroll, sprocket holes down both edges, a faint perforation every page |
+| NOTEBOOK | a yellow legal pad: glued binding at the top, red double margin, blue rules the type stands on, a red rubber date stamp (dark at MIDNIGHT) |
 | TABLE | a self-healing cutting mat with paper strips (scissor-cut edges, provenance by paper stock) and masking tape |
 | BENCH | ruled index cards with a coloured top edge, a masking-tape deck strip, chrome chord stamps |
 | RACK | cassette J-cards in a moulded tray; the Shoebox as index slips |
@@ -96,31 +104,34 @@ Haptics on touch-down. Both switchable. Motion is short, springy, transform-only
 ## 3. Information architecture
 
 ```
- ┌ top bezel: [⏏ TAPES] [ title strip / LCD ] [ legend · DIAL ] ┐
+ ┌ top bezel: [⏏ TAPES] [ LCD ] [ legend · DIAL ] ────────────────┐
  │                                                               │
- │   ROLL  ←— one desk, the dial pans across it —→  TABLE  BENCH │
+ │ NOTEBOOK ←— one desk, the dial pans across it —→ TABLE  BENCH │
  │                                                               │
  │   (TAPES swaps the desk for the Rack, inside the same window) │
- │ ▌CATCH slip (right edge, every surface)                       │
+ │ ▌CATCH slip (right edge, on Table and Bench)                  │
  └ bottom bezel: five context keys ──────────────────────────────┘
 ```
 
-* **Tape** (song) – owns a Roll, a Table, a Bench (sections, takes, arrangement), memos, history.
-* **Shoebox** – the one global pile of stray lines. Fed by CATCH, cut Bench lines, kept Table work. Drained by DRAW (Roll), DEAL (Table), the Shoebox drawer (Bench).
+* **Notebook** – global, made of pages. Belongs to no song. The app always opens on its newest page.
+* **Tape** (song) – owns a Table, a Bench (sections, takes, arrangement), memos, history.
+* **Shoebox** – the one global pile of stray lines. Fed by PUNCH (notebook), CATCH, cut Bench lines, kept Table work. Drained by DRAW (notebook), DEAL (Table), the Shoebox drawer (Bench).
 
 ---
 
 ## 4. Surfaces
 
-### 4.1 ROLL — freewriting (home base)
+### 4.1 NOTEBOOK — rambling (home)
 
 Keys: **LATCH · PEN · DRAW · PUNCH · SPRINT**
 
+* **Pages** — each page carries a red date stamp and a number. Come back after **45 minutes away or on a new day** and a fresh page is waiting (a blank page is reused, never stacked); `+` tears off a new one by hand. `‹ ›` (or a swipe on the header) flips through earlier pages, which stay writable. Tap the date stamp for the index: every page with its date and first line, searchable.
+
 * **Ghost ink** — finished words can't be erased: backspace strikes them through in graphite. *Typo grace*: the word you're still typing erases normally. Typing over a selection strikes the old words and writes after them. (DIP: GHOST INK.)
 * **LATCH** — forward only. Backspace is refused with a thud, the caret is pinned to the end, and a paper bail folds away everything above the last lines ("FORWARD ONLY") so you can't reread and judge. Unlatch and the bail lifts.
-* **DRAW** — a random scrap from the Shoebox (least-used first) is taped to the top of the scroll; ANOTHER / WRITE FROM IT (appends it and puts the caret after it).
+* **DRAW** — a random scrap from the Shoebox (least-used first) is taped to the top of the page; ANOTHER / WRITE FROM IT (appends it and puts the caret after it).
 * **PEN** — wax pencil. Tap a phrase (bounded by line breaks and sentence punctuation) to mark it, tap again to clear; press-hold-drag for an exact range.
-* **PUNCH** — every marked phrase is die-cut out (they fly off toward the Table), lands on the Table as a strip, and stays on the scroll as a cut-out. The LCD offers GO.
+* **PUNCH** — every marked phrase is die-cut out (they fly off the page) into the **Shoebox**, stamped `NOTEBOOK P.38`, and stays on the page as a cut-out. The LCD offers ON TABLE to lay them straight onto the current song's Table.
 * **SPRINT** — opt-in timed freewrite (5–60 min). Countdown on the LCD; at the bell the PEN key pulses and the LCD offers PEN.
 
 ### 4.2 TABLE — cut & recombine
@@ -182,21 +193,22 @@ The whole arrangement on one lead sheet in the current paper stock, chords hung 
 ## 6. Data model (IndexedDB, local-first)
 
 ```ts
+Page    { id, n, createdAt, updatedAt, text, marks[], spark?, fromSong? }   // the notebook
 Song    { id, title, ink, createdAt, updatedAt, deletedAt?, bpm, key?, capo, tuning,
-          roll{ text, marks[], spark?, sprintMs }, table: Strip[],
+          roll{…legacy, migrated to pages}, table: Strip[],
           sections: Section[], arrangement: {id, sectionId}[], memos: Memo[] }
 Section { id, kind, name?, take, takes: Take[], cadence?: ('u'|'S'|'r')[] }
 Take    { id, lines: Line[] }
 Line    { id, text, chords: {at, name}[], meter?: { [`${i}:${word}`]: { s?, d? } } }
 Strip   { id, text, x, y, rot, z, from: 'roll'|'deal'|'typed'|'splice'|'cut', joints?: number[] }
-Scrap   { id, text, from: 'catch'|'cut'|'table'|'roll', createdAt, songId?, used }
+Scrap   { id, text, from: 'catch'|'cut'|'table'|'roll'(notebook), createdAt, songId?, page?, used }
 Memo    { id, sectionId?, label, durMs, peaks[], mime }        // audio blob stored separately
 Settings{ paper, chassis, haptics, clicks, keys, grain, textSize, gutter, online, awake, leftHand, ghost, sprint }
 ```
 
-Stores: `songs`, `scraps`, `blobs`, `kv`, `history` (DB v2). Writes are debounced per song and flushed on `pagehide`;
+Stores: `songs`, `scraps`, `blobs`, `kv`, `history`, `pages` (DB v3; on first run the old rolls become pages, once). Writes are debounced per song and flushed on `pagehide`;
 the version being overwritten becomes a history snapshot when the last one is ≥ 3 min old.
-Backups: `{app:'portascribe', version:2, songs, scraps, blobs:{memoId: dataURL}}`.
+Backups: `{app:'portascribe', version:3, songs, scraps, pages, blobs:{memoId: dataURL}}`.
 
 ## 7. Integrations (all free, no key)
 
@@ -218,7 +230,7 @@ The three surfaces are panes on one "desk"; the outgoing pane stays mounted for 
 
 * `npm test` — engine unit tests (dictionary, syllables, stress, rhyme, scheme, diff/rebase, cadence, music, transpose, importer, meter overrides, migration, export).
 * `scripts/e2e/flows.mjs` — ~70 interactions at phone size: typo grace, ghost ink, latch & bail, draw, pen tap/drag, punch → table, deal, drag, snip, tape, cut-up + LCD undo, shuffle, sweep + undo, double-tap slip, slot to bench, split/merge, chord drag, swipe → shoebox, shoebox drawer, words swap, tabs, both lenses + meter override, transpose, stand auto-scroll, catch, rack shoebox, history, paste-in import, finish switch.
-* `scripts/e2e/persist.mjs` (production bundle), `perf.mjs` (4× CPU throttle), `tour.mjs` / `sheets.mjs` (screenshots).
+* `scripts/e2e/persist.mjs` (production bundle), `upgrade.mjs` (an MK-I/MK-II database opened by this build: rolls → pages, bones → shoebox, migration runs once), `perf.mjs` (4× CPU throttle), `tour.mjs` / `sheets.mjs` (screenshots).
 
 ## 10. Roadmap
 

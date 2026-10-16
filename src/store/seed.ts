@@ -33,11 +33,7 @@ export function seedSong(): Song {
     { id: uid(), sectionId: verse2.id },
     { id: uid(), sectionId: chorus.id },
   ];
-  song.roll.text =
-    'This is the Roll — cheap paper, one long scroll. Type fast and keep going. ' +
-    'Backspace never erases a finished word here: it strikes it through, so nothing is lost.\n\n' +
-    'Flip the LATCH and the carriage only goes forward: no backspace, and the lines behind you fold away so you can\'t reread and judge.\n\n' +
-    'Later, pick up the PEN and tap the lines that glow, then PUNCH them out onto the TABLE.\n';
+  song.roll.text = '';
   song.roll.marks = [];
   return song;
 }

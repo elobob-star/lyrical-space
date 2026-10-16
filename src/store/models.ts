@@ -74,13 +74,16 @@ export interface Scrap {
   from: ScrapFrom;
   createdAt: number;
   songId?: ID;
+  /** notebook page number it was punched from */
+  page?: number;
   used: number;
   /** legacy (v0.1): 'spark' | 'bone' */
   kind?: string;
 }
 
-/** "CAUGHT 3D AGO" / "CUT FROM BORROWED ROOM" — the little stamp on a scrap. */
+/** "CAUGHT 3D AGO" / "CUT FROM BORROWED ROOM" / "NOTEBOOK P.12" — the little stamp on a scrap. */
 export function provenance(s: Scrap, titleOf: (id?: ID) => string | undefined, ago: (t: number) => string): string {
+  if (s.from === 'roll') return s.page ? `NOTEBOOK P.${s.page} · ${ago(s.createdAt)}` : `FROM THE NOTEBOOK · ${ago(s.createdAt)}`;
   const t = titleOf(s.songId);
   if (s.from === 'catch' || !t) return `${s.from === 'cut' ? 'CUT' : s.from === 'table' ? 'KEPT' : 'CAUGHT'} ${ago(s.createdAt)}`;
   return `${s.from === 'cut' ? 'CUT FROM' : s.from === 'table' ? 'KEPT FROM' : 'FROM'} ${t.toUpperCase()}`;
@@ -90,6 +93,21 @@ export function normalizeScrap(s: Scrap): Scrap {
   if (s.from) return s;
   const { kind, ...rest } = s;
   return { ...rest, from: kind === 'bone' ? 'cut' : 'catch' };
+}
+
+/** One page of the notebook: rambling that belongs to no song (yet). */
+export interface Page {
+  id: ID;
+  /** page number, counting up from 1 */
+  n: number;
+  createdAt: number;
+  updatedAt: number;
+  text: string;
+  marks: Mark[];
+  /** a scrap drawn from the shoebox, taped to the top of the page */
+  spark?: string;
+  /** set when the page was carried over from an MK-I song roll */
+  fromSong?: string;
 }
 
 export type Paper = 'newsprint' | 'legal' | 'graph' | 'midnight';

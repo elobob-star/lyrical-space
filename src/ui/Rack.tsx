@@ -15,6 +15,7 @@ import { Key, Keys } from './Key';
 import { Sheet, TextSheet } from './Sheet';
 import { setMode } from './Bezel';
 import { signal } from '@preact/signals';
+import { currentPage, updatePage } from '../store/notebook';
 
 const importOpen = signal(false);
 
@@ -153,8 +154,9 @@ function Shoebox({ q }: { q: string }) {
           <div class="slip-foot">
             <span class="prov">{provenance(s, titleOf, ago)}{s.used ? ` · DRAWN ${s.used}×` : ''}</span>
             <span class="grow" />
-            <button aria-label="Write from it on the Roll" onClick={() => {
-              updateCurrent((d) => { d.roll.spark = s.text; });
+            <button aria-label="Write from it in the notebook" onClick={() => {
+              const pg = currentPage.peek();
+              if (pg) updatePage(pg.id, (d) => { d.spark = s.text; });
               updateScrap(s.id, { used: s.used + 1 });
               setMode('roll'); feel('thock', 'medium');
             }}><Icon n="draw" size={15} /></button>
@@ -230,13 +232,16 @@ export function Rack() {
   useEffect(() => { setQ(''); }, [tab]);
   return (
     <div class="rack" role="region" aria-label="Tape rack">
-      {tab !== 'bin' && (
-        <div class="rack-search">
-          <Icon n="search" size={15} />
-          <input placeholder={tab === 'tapes' ? 'search titles & lyrics…' : 'search the shoebox…'} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
-          {q && <button onClick={() => setQ('')} aria-label="Clear search"><Icon n="close" size={13} /></button>}
-        </div>
-      )}
+      <div class="rack-search">
+        {tab !== 'bin' ? (
+          <>
+            <Icon n="search" size={15} />
+            <input placeholder={tab === 'tapes' ? 'search titles & lyrics…' : 'search the shoebox…'} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+            {q && <button onClick={() => setQ('')} aria-label="Clear search"><Icon n="close" size={13} /></button>}
+          </>
+        ) : <span class="grow tiny">BINNED TAPES WAIT HERE FOR 30 DAYS</span>}
+        <button class="gear" aria-label="Setup" onClick={() => { feel('click'); layer.value = 'settings'; }}><Icon n="gear" size={16} stroke={1.5} /></button>
+      </div>
       <div class="rack-body">
         {tab === 'tapes' && (
           <>
@@ -247,7 +252,7 @@ export function Rack() {
         {tab === 'shoebox' && <Shoebox q={needle} />}
         {tab === 'bin' && (
           <>
-            {bin.length === 0 && <div class="tray-note">THE BIN IS EMPTY. BINNED TAPES WAIT HERE FOR 30 DAYS.</div>}
+            {bin.length === 0 && <div class="tray-note">THE BIN IS EMPTY.</div>}
             {bin.map((s) => (
               <div class="jcard binned" key={s.id} style={{ '--c': `var(--ink-${s.ink})` }}>
                 <div class="jc-main"><span class="jc-stripe" /><span class="jc-label"><span class="jc-title">{s.title}</span><span class="jc-meta">BINNED {ago(s.deletedAt!)}</span></span></div>
@@ -269,7 +274,7 @@ export function RackKeys() {
   const pick = (t: typeof tab) => { rackTab.value = t; };
   return (
     <Keys>
-      <Key icon="plus" label="New" tone="dark" sound="chk" onClick={() => { createSong(); layer.value = null; feel('eject', 'medium'); say('A BLANK TAPE — START ANYWHERE'); }} />
+      <Key icon="plus" label="New" tone="dark" sound="chk" onClick={() => { createSong(); mode.value = 'bench'; layer.value = null; feel('eject', 'medium'); say('A BLANK TAPE — NAME IT, OR JUST START A VERSE'); }} />
       <Key icon="import" label="Paste in" aria="Import" sound="click" onClick={() => { importOpen.value = true; }} />
       <Key icon="reel" label="Tapes" led on={tab === 'tapes'} sound="click" onClick={() => pick('tapes')} />
       <Key icon="box" label="Shoebox" led on={tab === 'shoebox'} sound="click" onClick={() => pick('shoebox')} />

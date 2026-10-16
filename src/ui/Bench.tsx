@@ -304,6 +304,7 @@ export function BenchView() {
 
   return (
     <div class={'mode-view bench lens-' + ln + (lane ? ' lanes' : '') + (armedChord.value ? ' armed' : '')}>
+      <BenchTitle song={song} />
       <Deck />
       <SongMap song={song} names={names} />
       <div class="bench-scroll">
@@ -337,6 +338,30 @@ export function BenchView() {
       {cadenceFor.value && <CadenceSheet />}
       {ghost && <div class="stamp ghost" style={{ left: ghost.x, top: ghost.y }}>{ghost.name}</div>}
     </div>
+  );
+}
+
+/** The song's name, typed at the top of the sheet. Tap to retype it. */
+function BenchTitle({ song }: { song: Song }) {
+  const [editing, setEditing] = useState(false);
+  const inp = useRef<HTMLInputElement>(null);
+  const done = () => {
+    const v = inp.current?.value.trim();
+    if (v) updateCurrent((d) => { d.title = v; });
+    setEditing(false);
+  };
+  if (editing) {
+    return (
+      <div class="bench-title">
+        <input ref={(el) => { inp.current = el; if (el && document.activeElement !== el) { el.focus(); el.select(); } }} aria-label="Song title" defaultValue={song.title} maxLength={60}
+          onBlur={done} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditing(false); }} />
+      </div>
+    );
+  }
+  return (
+    <button class="bench-title" aria-label="Song title" onClick={() => { feel('click'); setEditing(true); }}>
+      <span class="t">{song.title}</span><Icon n="edit" size={12} />
+    </button>
   );
 }
 

@@ -62,7 +62,7 @@ export function Settings() {
           if (!f) return;
           try {
             const r = await importBackup(await f.text());
-            say(`RESTORED ${r.songs} TAPES, ${r.scraps} SCRAPS`);
+            say(`RESTORED ${r.songs} TAPES, ${r.scraps} SCRAPS, ${r.pages} PAGES`);
           } catch { say('THAT FILE IS NOT A PORTASCRIBE BACKUP'); }
           (e.target as HTMLInputElement).value = '';
         }} />

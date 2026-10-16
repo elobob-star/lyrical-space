@@ -6,6 +6,7 @@ import {
 } from './models';
 import { seedScraps, seedSong } from './seed';
 import { dropHistory, forceSnapshot, maybeSnapshot } from './history';
+import { flushPages, loadNotebook, mergePages, pages } from './notebook';
 
 setAutoFreeze(false);
 
@@ -36,7 +37,6 @@ export function createSong(title = 'UNTITLED'): Song {
   const song = newSong(title);
   songs.value = [song, ...songs.value];
   currentId.value = song.id;
-  mode.value = 'roll';
   return song;
 }
 
@@ -90,10 +90,10 @@ export async function purgeSong(id: ID): Promise<void> {
 }
 
 // ---------- the Shoebox: one pile for every stray line ----------
-export function addScrap(text: string, from: ScrapFrom, songId?: ID): Scrap | null {
+export function addScrap(text: string, from: ScrapFrom, songId?: ID, extra: Partial<Scrap> = {}): Scrap | null {
   const t = text.trim();
   if (!t) return null;
-  const s: Scrap = { id: uid(), text: t, from, createdAt: Date.now(), songId, used: 0 };
+  const s: Scrap = { id: uid(), text: t, from, createdAt: Date.now(), songId, used: 0, ...extra };
   scraps.value = [s, ...scraps.value];
   return s;
 }
@@ -152,6 +152,7 @@ export function flushAll(): void {
   for (const s of scraps.value) if (savedScraps.get(s.id) !== s) { savedScraps.set(s.id, s); void dbPut('scraps', s.id, s); }
   void kvSet('settings', settings.value);
   void kvSet('meta', { currentId: currentId.value, mode: mode.value });
+  flushPages();
 }
 
 export async function boot(): Promise<void> {
@@ -187,7 +188,9 @@ export async function boot(): Promise<void> {
   const live = loaded.filter((s) => !s.deletedAt);
   currentId.value = live.find((s) => s.id === meta?.currentId)?.id ?? live[0]?.id ?? null;
   if (!currentId.value) createSong();
-  mode.value = meta?.mode ?? 'roll';
+  // the app always opens on the notebook
+  mode.value = 'roll';
+  await loadNotebook(loaded, !onboarded && !dbSongs.length && !dbScraps.length);
   if (loaded.length && !onboarded) void kvSet('seeded', true);
   void persistRequest();
   ready.value = true;
@@ -235,11 +238,11 @@ export async function backupAll(): Promise<string> {
     const b = await dbGet<Blob>('blobs', m.id);
     if (b) blobs[m.id] = await blobToDataUrl(b);
   }
-  return JSON.stringify({ app: 'portascribe', version: 2, exportedAt: new Date().toISOString(), songs: live, scraps: scraps.value, blobs });
+  return JSON.stringify({ app: 'portascribe', version: 3, exportedAt: new Date().toISOString(), songs: live, scraps: scraps.value, pages: pages.value, blobs });
 }
 
 /** Merge a backup into the library. */
-export async function importBackup(json: string): Promise<{ songs: number; scraps: number }> {
+export async function importBackup(json: string): Promise<{ songs: number; scraps: number; pages: number }> {
   const data = JSON.parse(json);
   if (data?.app !== 'portascribe') throw new Error('Not a Portascribe backup');
   const inSongs: Song[] = data.songs ?? [];
@@ -257,7 +260,8 @@ export async function importBackup(json: string): Promise<{ songs: number; scrap
   songs.value = merged;
   const knownScrap = new Set(scraps.value.map((s) => s.id));
   scraps.value = [...scraps.value, ...inScraps.filter((s) => !knownScrap.has(s.id))];
-  return { songs: inSongs.length, scraps: inScraps.length };
+  const nPages = mergePages(Array.isArray(data.pages) ? data.pages : []);
+  return { songs: inSongs.length, scraps: inScraps.length, pages: nPages };
 }
 
 export async function loadBlob(id: ID): Promise<Blob | undefined> {

@@ -5,13 +5,13 @@ wrapped around warm, imperfect paper. Built to beat perfectionism, not to write 
 
 | Dial | Surface | Keys | Borrowed from |
 |---|---|---|---|
-| **ROLL** | one long scroll of continuous-form paper | LATCH · PEN · DRAW · PUNCH · SPRINT | Kerouac / Dylan: freewrite. Backspace strikes finished words through (the word you're typing still erases). LATCH = forward only, with a bail that folds the past away. PEN taps the gems, PUNCH sends them to the Table. |
+| **NOTEBOOK** | a yellow legal pad of dated pages that belongs to no song — the app opens here | LATCH · PEN · DRAW · PUNCH · SPRINT | Dylan / Waits: just ramble. A fresh page after a break, old pages a flip back. Backspace strikes finished words through. LATCH = forward only. PEN taps the gems, PUNCH files them into the shoebox. |
 | **TABLE** | a cutting mat with paper strips | SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP | Bowie / Burroughs / Waits: tap a strip then a gap to snip, drop one on another's edge to tape, deal scraps from the shoebox, cut everything up. |
 | **BENCH** | ruled index cards | WORDS · CHORDS · LENS · SHOEBOX · STAND | Cohen / Nick Drake: sections and takes, chord stamps, rhyme & meter lenses, hold-to-hum per card, tuning/capo/tempo, a scratch tape, and a music stand that scrolls at tempo. |
 
 **⏏ TAPES** opens the rack: cassette J-cards, the **Shoebox** (one pile for every stray line), the bin, tape history,
-and **PASTE IN** (plain lyrics, chords-over-lyrics or ChordPro). The **CATCH** slip on the right edge files a line
-into the shoebox from anywhere. The **LCD** is the machine's only voice — tap it to UNDO or follow a hint.
+**PASTE IN** (plain lyrics, chords-over-lyrics or ChordPro) and SETUP. The **CATCH** slip on the right edge files a
+line into the shoebox while you're working on a song. The **LCD** is the machine's only voice — tap it to UNDO or follow a hint.
 
 Offline-first, no accounts, **no API keys**, no AI. Rhymes, syllables and stress come from a bundled CMU dictionary;
 Datamuse and the Free Dictionary API are optional extras.
@@ -35,7 +35,8 @@ npm run build        # type-check + production bundle in dist/
 Browser checks (need the dev server running; Chromium via Playwright):
 
 ```bash
-node scripts/e2e/flows.mjs out/     # ~70 interactions across every surface
+node scripts/e2e/flows.mjs out/     # ~80 interactions across every surface
+URL=http://127.0.0.1:4173/ node scripts/e2e/upgrade.mjs   # an older install's data opened by this build (vite preview)
 node scripts/e2e/tour.mjs out/      # screenshots of every surface
 node scripts/e2e/sheets.mjs out/    # screenshots of every sheet, light and dark
 ```
