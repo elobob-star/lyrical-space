@@ -171,7 +171,7 @@ export async function boot(): Promise<void> {
   }
   // the Bin keeps deleted tapes for 30 days
   const cutoff = Date.now() - 30 * 86_400_000;
-  for (const s of loaded.filter((x) => x.deletedAt && x.deletedAt < cutoff)) void dbDelete('songs', s.id);
+  for (const s of loaded.filter((x) => x.deletedAt && x.deletedAt < cutoff)) { void dbDelete('songs', s.id); void dropHistory(s.id); }
   loaded = loaded.filter((x) => !(x.deletedAt && x.deletedAt < cutoff));
   loaded.sort((a, b) => b.updatedAt - a.updatedAt);
   loaded.forEach((s) => savedRefs.set(s.id, s));
