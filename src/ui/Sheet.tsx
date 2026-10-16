@@ -10,15 +10,15 @@ export function Sheet({ title, onClose, children, right }: { title: string; onCl
       <div class="scrim" onClick={onClose} />
       <div class="sheet" role="dialog" aria-label={title}>
         <div class="grab" />
-        <h3><span>{title}</span><span class="row">{right}<button class="btn small" onClick={onClose} aria-label="Close"><Icon n="close" size={14} /></button></span></h3>
+        <h3><span>{title}</span><span class="row">{right}<button class="btn small" onClick={onClose} aria-label="Close"><Icon n="close" size={13} stroke={2} /></button></span></h3>
         <div class="body">{children}</div>
       </div>
     </>
   );
 }
 
-export function TextSheet({ title, value = '', placeholder, multiline, hand, okLabel = 'SAVE', onSave, onClose, extra }: {
-  title: string; value?: string; placeholder?: string; multiline?: boolean; hand?: boolean; okLabel?: string;
+export function TextSheet({ title, value = '', placeholder, multiline, ui, okLabel = 'SAVE', onSave, onClose, extra }: {
+  title: string; value?: string; placeholder?: string; multiline?: boolean; ui?: boolean; okLabel?: string;
   onSave: (v: string) => void; onClose: () => void; extra?: ComponentChildren;
 }) {
   const [v, setV] = useState(value);
@@ -28,10 +28,10 @@ export function TextSheet({ title, value = '', placeholder, multiline, hand, okL
   return (
     <Sheet title={title} onClose={onClose}>
       {multiline ? (
-        <textarea ref={ref} class={'field' + (hand ? ' hand' : '')} rows={4} value={v} placeholder={placeholder}
+        <textarea ref={ref} class={'field' + (ui ? ' ui' : '')} rows={4} value={v} placeholder={placeholder}
           onInput={(e) => setV((e.target as HTMLTextAreaElement).value)} />
       ) : (
-        <input ref={ref} class={'field' + (hand ? ' hand' : '')} value={v} placeholder={placeholder} enterKeyHint="done"
+        <input ref={ref} class={'field' + (ui ? ' ui' : '')} value={v} placeholder={placeholder} enterKeyHint="done"
           onInput={(e) => setV((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
       )}
       <div class="row" style={{ marginTop: '12px' }}>

@@ -4,25 +4,25 @@ import {
   ID, SECTION_KINDS, Section, SectionKind, Song, activeTake, sectionAbbrev, sectionNames,
 } from '../store/models';
 import { currentSong, updateCurrent } from '../store/state';
-import { analyzeFlow } from '../engine/rhyme';
+import { analyzeFlow, rhymeScheme } from '../engine/rhyme';
 import { lineInfo, stressWords } from '../engine/words';
 import { fitLine, stressToPattern } from '../engine/cadence';
 import { feel, haptic } from '../engine/feel';
-import { addTake, buryLine } from '../store/actions';
+import { addTake, cutLine } from '../store/actions';
 import {
-  addLineAfter, addSection, duplicateLine, focused, moveEntry, moveLine, removeEntry, removeLine, repeatEntry,
+  addLineAfter, addSection, duplicateLine, moveEntry, moveLine, removeEntry, removeLine, repeatEntry,
 } from '../store/lines';
-import { cmuTick, flowOn, layer, say, tray } from '../store/ui';
+import { cmuTick, hintOnce, layer, lens, Lens, say, tray } from '../store/ui';
 import { settings } from '../store/state';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
-import { Choices, Sheet, TextSheet } from './Sheet';
+import { Sheet, TextSheet } from './Sheet';
 import { LineRow, lineMenu } from './bench/BenchLine';
-import { ChordTray, BoneTray } from './bench/Trays';
-import { Deck, MemoPills, toggleRecord } from './bench/Deck';
+import { ChordTray, ShoeboxTray } from './bench/Trays';
+import { Deck, MemoPills, humHandlers } from './bench/Deck';
 import { recording } from '../engine/recorder';
 import { CadenceSheet, cadenceFor } from './bench/Cadence';
-import { ResultsTray, WheelOverlay, moveWheel, openWheel, releaseWheel, wheel } from './bench/Muse';
+import { WordsTray, openWords } from './bench/Muse';
 import { armedChord, chordGhost } from './bench/chordDrag';
 
 const selectedEntry = signal<ID | null>(null);
@@ -66,7 +66,7 @@ function SongMap({ song, names }: { song: Song; names: Map<ID, string> }) {
             const r = removeEntry(song.id, sel);
             selectedEntry.value = null;
             feel('thock', 'medium');
-            if (r) say(r.buried ? `REMOVED — ${r.buried} LINES TO THE BONEYARD` : 'REMOVED FROM SONG', { label: 'UNDO', run: r.undo });
+            if (r) say(r.buried ? `REMOVED — ${r.buried} LINES KEPT IN THE SHOEBOX` : 'REMOVED FROM THE SONG', { label: 'UNDO', run: r.undo });
           }}><Icon n="trash" size={15} />REMOVE</button>
         </div>
       )}
@@ -74,18 +74,22 @@ function SongMap({ song, names }: { song: Song; names: Map<ID, string> }) {
   );
 }
 
-function SectionCard({ song, sec, entryId, names, lane, flow }: { song: Song; sec: Section; entryId: ID; names: Map<ID, string>; lane: boolean; flow: boolean }) {
+function SectionCard({ song, sec, entryId, names, lane, lens: ln }: { song: Song; sec: Section; entryId: ID; names: Map<ID, string>; lane: boolean; lens: Lens }) {
   const take = activeTake(sec);
   const takes = sec.takes.length;
   const tIdx = Math.min(sec.take, takes - 1);
   const texts = take.lines.map((l) => l.text);
   const cmu = cmuTick.value;
-  const marks = useMemo(() => (flow ? analyzeFlow(texts) : null), [flow, texts.join('\u0001'), cmu]);
-  const infos = useMemo(() => take.lines.map((l) => lineInfo(l.text)), [texts.join('\u0001'), cmu]);
+  const sig = texts.join('\u0001');
+  const marks = useMemo(() => (ln === 'rhyme' ? analyzeFlow(texts) : null), [ln, sig, cmu]);
+  const scheme = useMemo(() => (marks ? rhymeScheme(texts, marks) : null), [marks]);
+  const meterSig = take.lines.map((l) => (l.meter ? JSON.stringify(l.meter) : '')).join('\u0001');
+  const infos = useMemo(() => take.lines.map((l) => lineInfo(l.text, l.meter)), [sig, meterSig, cmu]);
   const tpl = sec.cadence;
   const gutter = settings.value.gutter;
   const swipe = useRef<{ x: number; y: number; on: boolean } | null>(null);
   const [dir, setDir] = useState<'l' | 'r' | ''>('');
+  const hum = useMemo(() => humHandlers(sec.id), [sec.id]);
 
   const go = (d: -1 | 1) => {
     const n = tIdx + d;
@@ -115,7 +119,7 @@ function SectionCard({ song, sec, entryId, names, lane, flow }: { song: Song; se
         <button class="take" onClick={() => { takeSheet.value = sec.id; }} aria-label="Take options">TAKE {String(tIdx + 1).padStart(2, '0')}/{String(takes).padStart(2, '0')}</button>
         {takes > 1 && <button class="mini" aria-label="Next take" disabled={tIdx === takes - 1} onClick={() => go(1)}><Icon n="right" size={14} /></button>}
         <button class={'mini' + (tpl?.length ? ' lit' : '')} aria-label="Cadence" onClick={() => { feel('click'); cadenceFor.value = sec.id; }}><Icon n="note" size={15} /></button>
-        <button class={'mini' + (recThis ? ' lit rec' : '')} aria-label="Record memo for this section" onClick={() => void toggleRecord(sec.id)}><Icon n="mic" size={15} /></button>
+        <button class={'mini hum' + (recThis ? ' lit rec' : '')} aria-label="Hold to hum a melody for this section" {...(hum as any)}><Icon n="mic" size={15} /></button>
       </header>
       {tpl && tpl.length > 0 && (
         <div class="cad" aria-label="Cadence template">
@@ -130,12 +134,13 @@ function SectionCard({ song, sec, entryId, names, lane, flow }: { song: Song; se
           const m = marks ? marks[i] : [];
           return (
             <LineRow key={l.id} songId={song.id} sid={sec.id} line={l} marks={m} marksKey={m.map((x) => `${x.start}-${x.end}-${x.group}${x.kind[0]}`).join(',')}
+              lens={ln} scheme={scheme?.[i] ?? ''} words={info.words} wordsKey={ln === 'meter' ? info.words.map((w) => w.key + w.stress + (w.down ? '|' : '')).join(',') : ''}
               headroom={lane || l.chords.length > 0} syl={info.syl} fit={ft.fit} mism={ft.stressMismatch} gutter={gutter}
               neighbors={{ prev: take.lines[i - 1]?.id, next: take.lines[i + 1]?.id }} />
           );
         })}
       </div>
-      <button class="addline" onClick={() => { feel('click'); addLineAfter(song.id, sec.id, null); }}><Icon n="plus" size={13} /> LINE</button>
+      <button class="addline" onClick={() => { feel('click'); addLineAfter(song.id, sec.id, null); }}><Icon n="plus" size={12} /> LINE</button>
     </section>
   );
 }
@@ -156,7 +161,7 @@ function LineMenu() {
   const line = sec && activeTake(sec).lines.find((l) => l.id === m.lid);
   const close = () => (lineMenu.value = null);
   if (!sec || !line) return null;
-  const info = lineInfo(line.text);
+  const info = lineInfo(line.text, line.meter);
   return (
     <Sheet title={`LINE · ${info.syl}σ`} onClose={close}>
       <div class="stressline">{line.text.trim() ? stressWords(info.stress) : 'EMPTY LINE'}</div>
@@ -170,10 +175,10 @@ function LineMenu() {
           feel('chk', 'medium'); say('CADENCE COPIED FROM THIS LINE'); close();
         }}><span>USE AS CADENCE</span><small>measure the section against it</small></button>
         <button class="choice" onClick={() => {
-          const gone = line.text.trim() ? buryLine(song.id, sec.id, line.id) : { text: '', undo: removeLine(song.id, sec.id, line.id) };
-          close(); feel('thock', 'medium');
-          if (gone) say(gone.text ? 'FLICKED TO THE BONEYARD' : 'LINE REMOVED', { label: 'UNDO', run: gone.undo });
-        }}><span>→ BONEYARD</span></button>
+          const gone = line.text.trim() ? cutLine(song.id, sec.id, line.id) : { text: '', undo: removeLine(song.id, sec.id, line.id) };
+          close(); feel('snip', 'medium');
+          if (gone) say(gone.text ? 'CUT → SHOEBOX' : 'LINE REMOVED', { label: 'UNDO', run: gone.undo });
+        }}><span>CUT → SHOEBOX</span><small>keep it for another song</small></button>
         <button class="choice danger" onClick={() => {
           const undo = removeLine(song.id, sec.id, line.id);
           close(); feel('thock', 'medium');
@@ -288,23 +293,24 @@ function AddSheet() {
 
 export function BenchView() {
   const song = currentSong.value!;
-  const flow = flowOn.value;
+  const ln = lens.value;
   const t = tray.value;
   const names = sectionNames(song);
   const seen = new Set<ID>();
   const lane = t === 'chords';
   const ghost = chordGhost.value;
   useEffect(() => () => { armedChord.value = null; }, []);
+  useEffect(() => { hintOnce('bench', 'THE BENCH — BUILD THE SONG. SWIPE A LINE LEFT TO CUT IT · TAP A SYLLABLE COUNT FOR MORE'); }, []);
 
   return (
-    <div class={'mode-view bench' + (flow ? ' flow' : '') + (lane ? ' lanes' : '') + (armedChord.value ? ' armed' : '')}>
+    <div class={'mode-view bench lens-' + ln + (lane ? ' lanes' : '') + (armedChord.value ? ' armed' : '')}>
       <Deck />
       <SongMap song={song} names={names} />
       <div class="bench-scroll">
         {song.arrangement.length === 0 && (
           <div class="empty-bench">
-            <b>EMPTY BENCH</b>
-            <span>Add a verse here, or send strips over from the TABLE.</span>
+            <b>AN EMPTY BENCH</b>
+            <span>Start a verse here, paste a whole song in from the TAPES rack, or send strips over from the TABLE.</span>
             <button class="btn go" onClick={() => { addSection(song.id, 'verse'); feel('chk'); }}>+ FIRST VERSE</button>
           </div>
         )}
@@ -315,48 +321,43 @@ export function BenchView() {
           seen.add(sec.id);
           return rep
             ? <RepeatSlip key={a.id} sec={sec} names={names} from={a.id} />
-            : <SectionCard key={a.id} song={song} sec={sec} entryId={a.id} names={names} lane={lane} flow={flow} />;
+            : <SectionCard key={a.id} song={song} sec={sec} entryId={a.id} names={names} lane={lane} lens={ln} />;
         })}
-        {song.arrangement.length > 0 && <button class="add-section" onClick={() => { feel('click'); addSheet.value = true; }}><Icon n="plus" size={14} /> ADD SECTION</button>}
+        {song.arrangement.length > 0 && <button class="add-section" onClick={() => { feel('click'); addSheet.value = true; }}><Icon n="plus" size={13} /> ADD SECTION</button>}
         <div class="bench-tail" />
       </div>
       {t === 'chords' && <ChordTray />}
-      {t === 'bones' && <BoneTray />}
-      {t === 'results' && <ResultsTray />}
+      {t === 'shoebox' && <ShoeboxTray />}
+      {t === 'words' && <WordsTray />}
 
       {lineMenu.value && <LineMenu />}
       {sectionSheet.value && <SectionSheet id={sectionSheet.value} />}
       {takeSheet.value && <TakeSheet id={takeSheet.value} />}
       {addSheet.value && <AddSheet />}
       {cadenceFor.value && <CadenceSheet />}
-      <WheelOverlay />
       {ghost && <div class="stamp ghost" style={{ left: ghost.x, top: ghost.y }}>{ghost.name}</div>}
     </div>
   );
 }
 
+const LENS_NEXT: Record<Lens, Lens> = { off: 'rhyme', rhyme: 'meter', meter: 'off' };
+
 export function BenchKeys() {
   const t = tray.value;
-  const sw = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const ln = lens.value;
   return (
     <Keys>
-      <Key icon="wheel" label="Wheel" tone="orange" on={!!wheel.value} sound={null}
-        onPointerDown={(e) => {
-          const el = e.currentTarget as HTMLElement;
-          if (!openWheel(el, true)) return;
-          try { el.setPointerCapture(e.pointerId); } catch { /* */ }
-          sw.current = { x: e.clientX, y: e.clientY, moved: false };
-        }}
-        onPointerMove={(e) => {
-          const s = sw.current; if (!s) return;
-          if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10) s.moved = true;
-          if (s.moved) moveWheel(e.clientX, e.clientY);
-        }}
-        onPointerUp={(e) => { const s = sw.current; sw.current = null; if (s) releaseWheel(e.clientX, e.clientY, s.moved); }} />
-      <Key icon="chord" label="Chords" tone="blue" on={t === 'chords'} led="orange" sound="thock" onClick={() => { tray.value = t === 'chords' ? null : 'chords'; if (t === 'chords') armedChord.value = null; }} />
-      <Key icon="flow" label="Flow" tone="green" on={flowOn.value} led="green" sound="clunk" onClick={() => { flowOn.value = !flowOn.value; }} />
-      <Key icon="bones" label="Bones" tone="yellow" on={t === 'bones'} led="orange" sound="thock" onClick={() => { tray.value = t === 'bones' ? null : 'bones'; }} />
-      <Key icon="export" label="Export" tone="cap" sound="thock" onClick={() => { layer.value = 'export'; }} />
+      <Key icon="words" label="Words" led on={t === 'words'} sound="thock" onClick={() => { if (t === 'words') tray.value = null; else openWords(); }} />
+      <Key icon="chord" label="Chords" led on={t === 'chords'} sound="thock" onClick={() => { tray.value = t === 'chords' ? null : 'chords'; if (t === 'chords') armedChord.value = null; }} />
+      <Key icon="lens" label={ln === 'off' ? 'Lens' : ln === 'rhyme' ? 'Rhyme' : 'Meter'} aria="Lens" led={ln === 'meter' ? 'green' : 'amber'} on={ln !== 'off'} sound="clunk"
+        onClick={() => {
+          const n = LENS_NEXT[lens.peek()];
+          lens.value = n;
+          if (n === 'meter') { (document.activeElement as HTMLElement | null)?.blur?.(); armedChord.value = null; }
+          say(n === 'rhyme' ? 'LENS: RHYME — COLOURS & SCHEME LETTERS' : n === 'meter' ? 'LENS: METER — TAP A WORD TO FLIP ITS STRESS OR MARK A DOWNBEAT' : 'LENS OFF', undefined, 2400);
+        }} />
+      <Key icon="box" label="Shoebox" led on={t === 'shoebox'} sound="thock" onClick={() => { tray.value = t === 'shoebox' ? null : 'shoebox'; }} />
+      <Key icon="stand" label="Stand" tone="dark" sound="clunk" onClick={() => { tray.value = null; layer.value = 'stand'; }} />
     </Keys>
   );
 }

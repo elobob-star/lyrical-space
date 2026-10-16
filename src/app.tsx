@@ -1,18 +1,48 @@
-import { useEffect, useRef } from 'preact/hooks';
-import { boot, currentSong, mode, ready, settings } from './store/state';
-import { handleBack, keyboardOpen, layer, toast, dismissToast } from './store/ui';
-import { Bezel } from './ui/Bezel';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { boot, currentSong, mode, ready, settings, Mode } from './store/state';
+import { handleBack, keyboardOpen, layer } from './store/ui';
+import { Bezel, setMode } from './ui/Bezel';
 import { RollKeys, RollView } from './ui/Roll';
 import { TableKeys, TableView } from './ui/Table';
 import { BenchKeys, BenchView } from './ui/Bench';
-import { Rack } from './ui/Rack';
+import { Rack, RackKeys } from './ui/Rack';
 import { Settings } from './ui/Settings';
 import { Slip } from './ui/Slip';
 import { ExportSheet } from './ui/Export';
+import { Stand } from './ui/Stand';
 import { loadCmu } from './engine/cmuLoader';
 import { resetWordCache } from './engine/words';
 import { onCmuReady } from './engine/cmu';
 import { cmuTick } from './store/ui';
+
+const ORDER: Record<Mode, number> = { roll: 0, table: 1, bench: 2 };
+const VIEWS: Record<Mode, () => preact.JSX.Element> = { roll: RollView, table: TableView, bench: BenchView };
+
+/** The three surfaces lie side by side on one desk; turning the dial pans across it. */
+function Desk() {
+  const m = mode.value;
+  const song = currentSong.value;
+  const last = useRef(m);
+  const [panes, setPanes] = useState<Array<{ m: Mode; cls: string }>>([{ m, cls: 'fade-in' }]);
+  useEffect(() => {
+    const from = last.current;
+    last.current = m;
+    if (from === m) return;
+    const right = ORDER[m] > ORDER[from];
+    setPanes([{ m: from, cls: right ? 'exit-l' : 'exit-r' }, { m, cls: right ? 'enter-r' : 'enter-l' }]);
+    const t = setTimeout(() => setPanes([{ m, cls: '' }]), 440);
+    return () => clearTimeout(t);
+  }, [m]);
+  if (!song) return null;
+  return (
+    <div class="desk">
+      {panes.map((p) => {
+        const View = VIEWS[p.m];
+        return <div class={'pane ' + p.cls} key={p.m + song.id} aria-hidden={p.m !== m}><View /></div>;
+      })}
+    </div>
+  );
+}
 
 export function App() {
   useEffect(() => {
@@ -41,7 +71,8 @@ export function App() {
       const { App: CapApp } = await import('@capacitor/app');
       const h = await CapApp.addListener('backButton', () => {
         if (handleBack()) return;
-        if (mode.value !== 'roll') { mode.value = 'roll'; return; }
+        if (layer.peek()) { layer.value = null; return; }
+        if (mode.peek() !== 'roll') { setMode('roll'); return; }
         void CapApp.minimizeApp();
       });
       off = () => void h.remove();
@@ -49,7 +80,17 @@ export function App() {
     return () => { off?.(); vv?.removeEventListener('resize', sync); window.removeEventListener('resize', sync); };
   }, []);
 
-  // status-bar icon contrast follows the chassis finish (dark icons on aluminium)
+  // sheets dim everything below the top bezel, so the LCD stays readable while they're open
+  const top = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = top.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', el.getBoundingClientRect().bottom + 'px'));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready.value]);
+
+  // status-bar icon contrast follows the chassis finish
   const finish = settings.value.chassis;
   useEffect(() => {
     void import('@capacitor/core').then(async ({ Capacitor }) => {
@@ -59,33 +100,13 @@ export function App() {
         await StatusBar.setStyle({ style: finish === 'alu' ? Style.Light : Style.Dark });
       } catch { /* optional */ }
     });
-    document.querySelector('meta[name=theme-color]')?.setAttribute('content', finish === 'alu' ? '#e6e4de' : '#1f2125');
+    const c = finish === 'alu' ? '#dfdbd2' : '#2a2927';
+    document.querySelector('meta[name=theme-color]')?.setAttribute('content', c);
+    document.body.style.background = c;
   }, [finish]);
 
-  // tilt lighting: a soft specular sheen drifts across the chassis as the phone tilts (compositor-only transform)
-  const sheen = useRef<HTMLDivElement>(null);
-  const tilt = settings.value.tilt;
-  useEffect(() => {
-    const el = sheen.current;
-    if (!el || !tilt) { if (el) el.style.transform = ''; return; }
-    let raf = 0, tx = 0, ty = 0, cx = 0, cy = 0;
-    const loop = () => {
-      cx += (tx - cx) * 0.12; cy += (ty - cy) * 0.12;
-      el.style.transform = `translate3d(${cx.toFixed(1)}px, ${cy.toFixed(1)}px, 0)`;
-      raf = Math.abs(tx - cx) + Math.abs(ty - cy) > 0.2 ? requestAnimationFrame(loop) : 0;
-    };
-    const on = (e: DeviceOrientationEvent) => {
-      if (e.gamma == null || e.beta == null) return;
-      tx = Math.max(-40, Math.min(40, e.gamma * 1.6));
-      ty = Math.max(-30, Math.min(30, (e.beta - 55) * 1.1));
-      if (!raf) raf = requestAnimationFrame(loop);
-    };
-    window.addEventListener('deviceorientation', on, { passive: true });
-    return () => { window.removeEventListener('deviceorientation', on); cancelAnimationFrame(raf); };
-  }, [tilt]);
-
-  // wake lock
-  const awake = settings.value.awake;
+  // wake lock (always on while the music stand is up)
+  const awake = settings.value.awake || layer.value === 'stand';
   useEffect(() => {
     if (!awake) return;
     let lock: any;
@@ -96,45 +117,31 @@ export function App() {
     return () => { document.removeEventListener('visibilitychange', vis); void lock?.release?.(); };
   }, [awake]);
 
-  if (!ready.value) return <div class="chassis boot"><div class="boot-msg">PORTASCRIBE MK-I<br /><small>WARMING UP…</small></div></div>;
+  // opening the rack puts the keyboard away
+  const ly = layer.value;
+  useEffect(() => { if (ly === 'rack') (document.activeElement as HTMLElement | null)?.blur?.(); }, [ly]);
+
+  if (!ready.value) return <div class="chassis boot" data-chassis="alu"><div class="boot-msg">PORTASCRIBE MK-II<br /><small>WARMING UP…</small></div></div>;
 
   const st = settings.value;
   const m = mode.value;
-  const song = currentSong.value;
-  const t = toast.value;
-  const order = { roll: 0, table: 1, bench: 2 } as const;
+  const rack = ly === 'rack';
 
   return (
     <div class={'chassis' + (keyboardOpen.value ? ' kb-open' : '')} data-paper={st.paper} data-chassis={st.chassis} data-ts={st.textSize} data-grain={st.grain ? 'on' : 'off'}>
-      <div class="sheen" ref={sheen} />
-      <Bezel />
+      <div ref={top}><Bezel /></div>
       <div class="screen">
         <div class="paper-bg" />
-        {song && (
-          <div class="mode-view-wrap" key={m + song.id} style={{ '--from': order[m] === 0 ? '-14px' : '14px' }}>
-            {m === 'roll' && <RollView />}
-            {m === 'table' && <TableView />}
-            {m === 'bench' && <BenchView />}
-          </div>
-        )}
-        <Slip />
+        <Desk />
+        {rack && <Rack />}
+        {!rack && <Slip />}
       </div>
-      <div class="bezel-bottom" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.key, .keyslot')) e.preventDefault(); }}>
-        {m === 'roll' && <RollKeys />}
-        {m === 'table' && <TableKeys />}
-        {m === 'bench' && <BenchKeys />}
+      <div class="bezel-bottom" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.key')) e.preventDefault(); }}>
+        {rack ? <RackKeys /> : m === 'roll' ? <RollKeys /> : m === 'table' ? <TableKeys /> : <BenchKeys />}
       </div>
-      <i class="screw" style={{ left: '5px', bottom: 'calc(var(--safe-bottom) + 5px)' }} />
-      <i class="screw" style={{ right: '5px', bottom: 'calc(var(--safe-bottom) + 5px)' }} />
-      {layer.value === 'rack' && <Rack />}
-      {layer.value === 'settings' && <Settings />}
-      {layer.value === 'export' && <ExportSheet />}
-      {t && (
-        <div class="toast" role="status">
-          <span>{t.msg}</span>
-          {t.action && <button onClick={() => { t.action!.run(); dismissToast(); }}>{t.action.label}</button>}
-        </div>
-      )}
+      {ly === 'settings' && <Settings />}
+      {ly === 'export' && <ExportSheet />}
+      {ly === 'stand' && <Stand />}
     </div>
   );
 }

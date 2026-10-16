@@ -1,24 +1,18 @@
+/* =====================================================================
+   PORTASCRIBE — design tokens
+   The MACHINE is cold, matte and precise (putty aluminium, bone keycaps, one dark LCD).
+   The MEDIA is warm and imperfect (paper, typewriter ink, wax pencil, masking tape).
+   ===================================================================== */
 :root {
-  --bezel: #17181b;
-  --bezel-2: #212327;
-  --bezel-3: #2c2f35;
-  --bezel-hi: #3b3e46;
-  --bezel-lo: #0b0c0e;
-  --silk: #d9d4c5;
-  --silk-dim: #8b887e;
-  --orange: #ff5b1f;
-  --orange-d: #c9410f;
-  --led-green: #4be37f;
-  --led-red: #ff3b30;
-  --led-amber: #ffb020;
-  --led-yellow: #ffe14a;
-
-  --font-ui: 'Space Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  --font-silk: 'Barlow Condensed', 'Arial Narrow', sans-serif;
-  --font-lcd: 'Doto', 'Space Mono', monospace;
+  --font-ui: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-type: 'Courier Prime', 'Courier New', ui-monospace, monospace;
-  --font-display: 'Special Elite', 'Courier Prime', monospace;
-  --font-hand: 'Caveat', 'Comic Sans MS', cursive;
+  --font-lcd: 'Doto', ui-monospace, monospace;
+
+  --accent: #ff4f00;
+  --accent-2: #e04400;
+  --amber: #ffb000;
+  --green: #47c26b;
+  --red: #e5372a;
 
   --ink-0: #d9432b; --ink-1: #c98a14; --ink-2: #7d8b2e; --ink-3: #1f8a84;
   --ink-4: #3b4fa8; --ink-5: #8a3f86; --ink-6: #c9507a; --ink-7: #5b6670;
@@ -30,78 +24,97 @@
   --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
 
   --ease: cubic-bezier(.2, .8, .2, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --spring: linear(0, 0.1851, 0.565, 0.9268, 1.1561, 1.2331, 1.1979, 1.1111, 1.0245, 0.9673, 0.9459, 0.9521, 0.9718, 0.9925, 1.0067, 1.0125, 1.0115, 1.0071, 1.0022, 0.9987, 0.9971, 0.9972, 0.9982, 0.9994, 1.0002, 1.0007, 1.0007, 1.0004, 1);
   --spring-soft: linear(0, 0.09, 0.2949, 0.5347, 0.7558, 0.9289, 1.0446, 1.1066, 1.1262, 1.117, 1.0921, 1.0618, 1.0335, 1.0109, 0.9955, 0.9871, 0.9841, 0.985, 0.988, 0.9918, 0.9954, 0.9984, 1.0004, 1.0016, 1.002, 1.0019, 1.0016, 1.0011, 1);
-  --spring-snap: linear(0, 0.1851, 0.565, 0.9268, 1.1561, 1.2331, 1.1979, 1.1111, 1.0245, 0.9673, 0.9459, 0.9521, 0.9718, 0.9925, 1.0067, 1.0125, 1.0115, 1.0071, 1.0022, 0.9987, 0.9971, 0.9972, 0.9982, 0.9994, 1.0002, 1.0007, 1.0007, 1.0004, 1);
-  /* light comes from the top-left; elevation = layered shadows */
-  --e1: 0 1px 1px rgba(0, 0, 0, .25), 0 2px 4px rgba(0, 0, 0, .18);
-  --e2: 0 2px 2px rgba(0, 0, 0, .22), 0 5px 9px rgba(0, 0, 0, .22), 0 10px 18px rgba(0, 0, 0, .14);
-  --e3: 0 3px 3px rgba(0, 0, 0, .25), 0 10px 18px rgba(0, 0, 0, .28), 0 22px 36px rgba(0, 0, 0, .2);
-  --ts: 17px;
-  --lh: 28px;
+
+  --ts: 16px;
+  --lh: 27px;
+
+  /* 3% monochrome bead-blast noise for the chassis */
+  --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' seed='7' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.055'/></svg>");
+  /* paper fibre */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .25  0 0 0 0 .18  0 0 0 0 .08  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.5'/></svg>");
 }
 
-[data-ts='0'] { --ts: 15px; --lh: 25px; }
-[data-ts='1'] { --ts: 17px; --lh: 28px; }
-[data-ts='2'] { --ts: 19.5px; --lh: 31px; }
+[data-ts='0'] { --ts: 14.5px; --lh: 25px; }
+[data-ts='1'] { --ts: 16px; --lh: 27px; }
+[data-ts='2'] { --ts: 18.5px; --lh: 30px; }
 
-[data-paper='newsprint'] {
-  --paper: #e9e0cb; --paper-2: #ddd3ba; --paper-edge: #c9bd9f;
-  --ink: #26221c; --ink-2: #4b4439; --ink-faint: rgba(38, 34, 28, .42);
-  --rule: rgba(95, 72, 35, .17); --rule-strong: rgba(95, 72, 35, .3);
-  --strip: #f6efdd; --strip-ink: #1f1b15;
-  --shadow: rgba(45, 30, 8, .32);
-  --hl: rgba(255, 208, 0, .58);
-  --card: #f1e9d4; --card-2: #e3d9be;
-  --grain-a: .24;
-}
-[data-paper='graph'] {
-  --paper: #e2e8e6; --paper-2: #d4dcd9; --paper-edge: #bcc8c4;
-  --ink: #18222c; --ink-2: #3a4a58; --ink-faint: rgba(24, 34, 44, .42);
-  --rule: rgba(40, 95, 170, .16); --rule-strong: rgba(40, 95, 170, .3);
-  --strip: #f4f8f7; --strip-ink: #15202a;
-  --shadow: rgba(10, 30, 50, .3);
-  --hl: rgba(255, 220, 40, .6);
-  --card: #eef3f1; --card-2: #d9e1de;
-  --grain-a: .14;
-}
-[data-paper='midnight'] {
-  --paper: #29251f; --paper-2: #211e19; --paper-edge: #3a352c;
-  --ink: #eee4cd; --ink-2: #cbc0a6; --ink-faint: rgba(238, 228, 205, .42);
-  --rule: rgba(255, 236, 190, .08); --rule-strong: rgba(255, 236, 190, .16);
-  --strip: #ddd3ba; --strip-ink: #1d1a15;
-  --shadow: rgba(0, 0, 0, .55);
-  --hl: rgba(255, 214, 10, .38);
-  --card: #322e27; --card-2: #3b362d;
-  --grain-a: .3;
-}
-
-[data-paper='legal'] {
-  --paper: #f1e4a0; --paper-2: #e6d68a; --paper-edge: #cdbd6c;
-  --ink: #1d2230; --ink-2: #3a4258; --ink-faint: rgba(29, 34, 48, .45);
-  --rule: rgba(52, 96, 190, .32); --rule-strong: rgba(214, 62, 52, .55);
-  --strip: #fbf6dc; --strip-ink: #1d2230;
-  --shadow: rgba(60, 45, 5, .35);
-  --hl: rgba(255, 120, 190, .5);
-  --card: #fbf6e0; --card-2: #ecdfa6;
-  --grain-a: .15;
-}
-
-/* ---- chassis finishes ---- */
-.chassis[data-chassis='alu'] {
-  --ch-top: #e6e4de; --ch-bot: #cbc9c1; --ch-line: rgba(0, 0, 0, .16); --ch-hi: rgba(255, 255, 255, .75);
-  --silk: #2a2925; --silk-dim: #7b786e; --silk-soft: #55524a;
-  --cap: #f4f2eb; --cap-ink: #25241f; --cap-edge: #a9a69b;
-  --well: #17181b; --well-hi: rgba(255, 255, 255, .5);
-  --label-bg: #f7f4ea; --label-ink: #14130f;
-  --knob-a: #f2f0ea; --knob-b: #a9a69c; --knob-ring: #9a978c;
-  --screw: #b4b1a6;
+/* ---------------- chassis finishes ---------------- */
+.chassis, .chassis[data-chassis='alu'] {
+  --body: #dfdbd2; --body-2: #d7d3c9; --body-3: #cfcabf;
+  --seam: #b8b3a8; --seam-hi: #ece9e2;
+  --silk: #2b2a28; --silk-2: #6e6a62; --silk-3: #9a958b;
+  --well: #8c877e; --well-hi: #ece9e2;
+  --cap: #f0ede6; --cap-hi: #f8f6f1; --cap-edge: #bdb8ae; --cap-ink: #2b2a28;
+  --capd: #2f2e2b; --capd-hi: #3c3b38; --capd-edge: #141312; --capd-ink: #f0ede6;
+  --led-off: #55524d;
+  --lcd-bg: #1c1b19; --lcd-ink: #efe8d8; --lcd-dim: rgba(239, 232, 216, .34); --lcd-hot: #ff6a1f;
+  --panel: #e7e4dd; --panel-2: #dcd8cf; --panel-line: rgba(43, 42, 40, .12);
+  --field: #f7f5ef; --field-ink: #23211d;
+  --scrim: rgba(43, 40, 36, .34);
+  --tray: #cfcabf; --tray-2: #c4bfb3;
+  --screen-lip: #aba69c;
 }
 .chassis[data-chassis='charcoal'] {
-  --ch-top: #1f2125; --ch-bot: #131417; --ch-line: rgba(255, 255, 255, .06); --ch-hi: rgba(255, 255, 255, .1);
-  --silk: #d9d4c5; --silk-dim: #8b887e; --silk-soft: #a7a396;
-  --cap: #34373e; --cap-ink: #ece7d8; --cap-edge: #0b0b0d;
-  --well: #08090a; --well-hi: rgba(255, 255, 255, .08);
-  --label-bg: #0e0f11; --label-ink: #f2eee2;
-  --knob-a: #4a4d56; --knob-b: #181a1e; --knob-ring: #000;
-  --screw: #3b3e45;
+  --body: #2a2927; --body-2: #252422; --body-3: #201f1d;
+  --seam: #151413; --seam-hi: #3a3936;
+  --silk: #e9e4d8; --silk-2: #a39e93; --silk-3: #6f6b63;
+  --well: #131211; --well-hi: #3a3936;
+  --cap: #3b3a37; --cap-hi: #464542; --cap-edge: #1a1918; --cap-ink: #ece7db;
+  --capd: #e9e4d8; --capd-hi: #f4f0e7; --capd-edge: #a8a397; --capd-ink: #2b2a28;
+  --led-off: #4a4844;
+  --lcd-bg: #0f0e0d; --lcd-ink: #efe8d8; --lcd-dim: rgba(239, 232, 216, .3); --lcd-hot: #ff6a1f;
+  --panel: #31302d; --panel-2: #282725; --panel-line: rgba(255, 255, 255, .07);
+  --field: #1e1d1b; --field-ink: #ece7db;
+  --scrim: rgba(0, 0, 0, .5);
+  --tray: #242321; --tray-2: #1d1c1a;
+  --screen-lip: #121110;
+}
+
+/* ---------------- paper stocks ---------------- */
+[data-paper='newsprint'] {
+  --paper: #ece4d0; --paper-2: #e2d9c2; --paper-edge: #cfc3a6;
+  --ink: #24201a; --ink-2: #4b4439; --ink-faint: rgba(36, 32, 26, .42);
+  --rule: rgba(95, 72, 35, .14); --rule-strong: rgba(95, 72, 35, .3);
+  --strip: #f5efe0; --strip-2: #ebe2cc; --strip-ink: #1f1b15;
+  --shadow: rgba(45, 30, 8, .3);
+  --wax: #fce181; --wax-done: rgba(120, 100, 60, .16);
+  --card: #f3ecda; --card-2: #e5dcc3;
+  --card-rule: rgba(60, 110, 200, .24); --card-red: rgba(214, 62, 52, .5);
+  --mat: #4c6d61; --mat-line: rgba(232, 240, 230, .16); --mat-line-2: rgba(232, 240, 230, .34);
+}
+[data-paper='legal'] {
+  --paper: #f2e6a6; --paper-2: #e8d98f; --paper-edge: #cdbd6c;
+  --ink: #1d2230; --ink-2: #3a4258; --ink-faint: rgba(29, 34, 48, .45);
+  --rule: rgba(52, 96, 190, .28); --rule-strong: rgba(214, 62, 52, .5);
+  --strip: #fbf6dc; --strip-2: #f1e8bf; --strip-ink: #1d2230;
+  --shadow: rgba(60, 45, 5, .32);
+  --wax: #ff9ec7; --wax-done: rgba(120, 100, 40, .16);
+  --card: #fbf6e0; --card-2: #ecdfa6;
+  --card-rule: rgba(52, 96, 190, .28); --card-red: rgba(214, 62, 52, .55);
+  --mat: #3f5f74; --mat-line: rgba(230, 240, 250, .16); --mat-line-2: rgba(230, 240, 250, .34);
+}
+[data-paper='graph'] {
+  --paper: #e4e9e6; --paper-2: #d6ddda; --paper-edge: #bcc8c4;
+  --ink: #18222c; --ink-2: #3a4a58; --ink-faint: rgba(24, 34, 44, .42);
+  --rule: rgba(40, 95, 170, .15); --rule-strong: rgba(40, 95, 170, .3);
+  --strip: #f5f8f6; --strip-2: #e6ece9; --strip-ink: #15202a;
+  --shadow: rgba(10, 30, 50, .28);
+  --wax: #fde68a; --wax-done: rgba(40, 70, 100, .14);
+  --card: #f0f4f2; --card-2: #dbe2df;
+  --card-rule: rgba(40, 95, 170, .2); --card-red: rgba(214, 62, 52, .45);
+  --mat: #55616b; --mat-line: rgba(235, 240, 245, .15); --mat-line-2: rgba(235, 240, 245, .32);
+}
+[data-paper='midnight'] {
+  --paper: #2a2620; --paper-2: #221f1a; --paper-edge: #3a352c;
+  --ink: #eee4cd; --ink-2: #cbc0a6; --ink-faint: rgba(238, 228, 205, .42);
+  --rule: rgba(255, 236, 190, .07); --rule-strong: rgba(255, 236, 190, .15);
+  --strip: #ddd3ba; --strip-2: #cfc4a8; --strip-ink: #1d1a15;
+  --shadow: rgba(0, 0, 0, .55);
+  --wax: #8a6d12; --wax-done: rgba(255, 236, 190, .1);
+  --card: #322e27; --card-2: #3b362d;
+  --card-rule: rgba(255, 255, 255, .07); --card-red: rgba(255, 120, 100, .4);
+  --mat: #1f2b27; --mat-line: rgba(220, 235, 225, .08); --mat-line-2: rgba(220, 235, 225, .2);
 }

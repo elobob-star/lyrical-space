@@ -1,5 +1,5 @@
 import { signal } from '@preact/signals';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { ID } from '../../store/models';
 import { currentSong, settings } from '../../store/state';
 import { focusLine, focused, setLineText } from '../../store/lines';
@@ -8,19 +8,24 @@ import { Candidate, offlineRhymes } from '../../engine/rhyme';
 import { commonRank } from '../../engine/common';
 import { Definition, DmRel, DmWord, datamuse, define } from '../../engine/net';
 import { tokenize, wordInfo } from '../../engine/words';
-import { feel, haptic } from '../../engine/feel';
+import { feel } from '../../engine/feel';
 import { Icon } from '../icons';
 import { cmuTick } from '../../store/ui';
 
 export type MuseKind = 'rhyme' | 'slant' | 'sense' | 'like' | 'oppose' | 'define';
-const SECTORS: Array<{ kind: MuseKind; label: string; icon: string; hint: string }> = [
-  { kind: 'rhyme', label: 'RHYME', icon: 'note', hint: 'perfect' },
-  { kind: 'slant', label: 'SLANT', icon: 'flow', hint: 'near' },
-  { kind: 'sense', label: 'SENSE', icon: 'eye', hint: 'imagery' },
-  { kind: 'like', label: 'LIKE', icon: 'copy', hint: 'synonyms' },
-  { kind: 'oppose', label: 'OPPOSE', icon: 'shuffle', hint: 'antonyms' },
-  { kind: 'define', label: 'DEFINE', icon: 'card', hint: 'meaning' },
+const TABS: Array<{ kind: MuseKind; label: string }> = [
+  { kind: 'rhyme', label: 'RHYME' }, { kind: 'slant', label: 'SLANT' }, { kind: 'sense', label: 'SENSE' },
+  { kind: 'like', label: 'LIKE' }, { kind: 'oppose', label: 'OPPOSE' }, { kind: 'define', label: 'DEFINE' },
 ];
+let lastKind: MuseKind = 'rhyme';
+
+/** The WORDS key: look up the word under the caret (or open the card blank to type one in). */
+export function openWords(): void {
+  const t = getTarget();
+  tray.value = 'words';
+  if (t) void runMuse(lastKind, t);
+  else results.value = { kind: lastKind, target: null, groups: [], loading: false };
+}
 
 export interface Target { sid: ID; lid: ID; start: number; end: number; word: string }
 
@@ -39,95 +44,14 @@ export function getTarget(): Target | null {
   return { sid: f.sid, lid: f.lid, start: tok.start, end: tok.end, word: tok.text.replace(/[’']+$/, (m) => (/in['’]$/i.test(tok.text) ? m : '')) };
 }
 
-// ---------- wheel ----------
-interface WheelState { cx: number; cy: number; active: number; hold: boolean; target: Target }
-export const wheel = signal<WheelState | null>(null);
-const R = 122, HUB = 34;
-
-export function sectorAt(w: WheelState, x: number, y: number): number {
-  const dx = x - w.cx, dy = y - w.cy;
-  const d = Math.hypot(dx, dy);
-  if (d < HUB - 4 || d > R + 26) return -1;
-  const ang = (Math.atan2(dx, -dy) * 180) / Math.PI;
-  return Math.floor((((ang + 30) % 360) + 360) % 360 / 60);
-}
-
-export function openWheel(keyEl: HTMLElement, hold: boolean): boolean {
-  const target = getTarget();
-  if (!target) { say('TAP INTO A WORD FIRST'); return false; }
-  const r = keyEl.getBoundingClientRect();
-  const W = window.innerWidth;
-  const cx = Math.max(R + 10, Math.min(W - R - 10, r.left + r.width / 2));
-  const cy = Math.max(R + 70, r.top - R - 26);
-  wheel.value = { cx, cy, active: -1, hold, target };
-  feel('click', 'medium');
-  return true;
-}
-
-export function moveWheel(x: number, y: number): void {
-  const w = wheel.value;
-  if (!w) return;
-  const a = sectorAt(w, x, y);
-  if (a !== w.active) { wheel.value = { ...w, active: a }; if (a >= 0) haptic('light'); }
-}
-
-export function releaseWheel(x: number, y: number, moved: boolean): void {
-  const w = wheel.value;
-  if (!w) return;
-  const a = sectorAt(w, x, y);
-  if (moved || a >= 0) {
-    if (a >= 0 && (moved || w.hold)) { wheel.value = null; void runMuse(SECTORS[a].kind, w.target); return; }
-    if (moved) { wheel.value = null; return; }
-  }
-  // quick tap: leave wheel open for tap selection
-  wheel.value = { ...w, hold: false, active: -1 };
-}
-
-function wedge(i: number, r0: number, r1: number): string {
-  const a0 = ((i * 60 - 30 + 2.2) * Math.PI) / 180, a1 = ((i * 60 + 30 - 2.2) * Math.PI) / 180;
-  const p = (r: number, a: number) => `${(r * Math.sin(a)).toFixed(1)} ${(-r * Math.cos(a)).toFixed(1)}`;
-  return `M ${p(r0, a0)} L ${p(r1, a0)} A ${r1} ${r1} 0 0 1 ${p(r1, a1)} L ${p(r0, a1)} A ${r0} ${r0} 0 0 0 ${p(r0, a0)} Z`;
-}
-
-export function WheelOverlay() {
-  const w = wheel.value;
-  if (!w) return null;
-  return (
-    <div class="wheel-scrim"
-      onPointerDown={(e) => {
-        const a = sectorAt(w, e.clientX, e.clientY);
-        if (a >= 0) { wheel.value = null; void runMuse(SECTORS[a].kind, w.target); } else wheel.value = null;
-      }}>
-      <svg class="wheel" viewBox={`${-R - 8} ${-R - 8} ${2 * R + 16} ${2 * R + 16}`} style={{ left: w.cx - R - 8, top: w.cy - R - 8, width: 2 * R + 16, height: 2 * R + 16 }}>
-        <circle r={R + 6} fill="#0a0b0d" stroke="#2c2f35" stroke-width="1.5" />
-        {SECTORS.map((s, i) => {
-          const mid = (i * 60 * Math.PI) / 180;
-          const lx = Math.sin(mid) * 84, ly = -Math.cos(mid) * 84;
-          const on = w.active === i;
-          return (
-            <g key={s.kind} class={'sec' + (on ? ' on' : '')}>
-              <path d={wedge(i, HUB + 6, R)} />
-              <g transform={`translate(${lx} ${ly})`} class="lab">
-                <g transform="translate(-9 -20)"><Icon n={s.icon} size={18} /></g>
-                <text y="6" text-anchor="middle" class="t1">{s.label}</text>
-                <text y="17" text-anchor="middle" class="t2">{s.hint}</text>
-              </g>
-            </g>
-          );
-        })}
-        <circle r={HUB} fill="#16171a" stroke="#3b3e46" />
-        <text y="4" text-anchor="middle" class="hub">{w.target.word.length > 9 ? w.target.word.slice(0, 8) + '…' : w.target.word}</text>
-      </svg>
-    </div>
-  );
-}
-
 // ---------- results ----------
 export interface Item { word: string; syl: number; freq: number; stress: string }
 interface Group { title: string; items: Item[] }
 interface Results {
   kind: MuseKind;
-  target: Target;
+  /** null: a free lookup typed into the card, nothing to swap */
+  target: Target | null;
+  word?: string;
   groups: Group[];
   loading: boolean;
   note?: string;
@@ -155,16 +79,17 @@ function mergeItems(...lists: Item[][]): Item[] {
 
 const TITLES: Record<MuseKind, string> = { rhyme: 'RHYMES', slant: 'SLANT RHYMES', sense: 'SENSORY', like: 'LIKE', oppose: 'OPPOSITES', define: 'DEFINITION' };
 
-export async function runMuse(kind: MuseKind, target: Target): Promise<void> {
+export async function runMuse(kind: MuseKind, target: Target | null, free?: string): Promise<void> {
   const id = ++runId;
-  const word = target.word.toLowerCase().replace(/^'+|'+$/g, '');
+  lastKind = kind;
+  const word = (target?.word ?? free ?? '').toLowerCase().trim().replace(/^'+|'+$/g, '');
+  if (!word) return;
   const online = settings.peek().online;
   const put = (groups: Group[], loading: boolean, extra: Partial<Results> = {}) => {
-    if (id === runId) results.value = { kind, target, groups, loading, ...extra };
+    if (id === runId) results.value = { kind, target, word, groups, loading, ...extra };
   };
-  tray.value = 'results';
+  tray.value = 'words';
   put([], true);
-  feel('thock', 'light');
 
   const run = async (rel: DmRel): Promise<Item[]> => (await datamuse(rel, word)).map(fromDm);
   try {
@@ -209,6 +134,7 @@ export function applyWord(r: Results, next: string): void {
   const song = currentSong.value;
   if (!song) return;
   const t = r.target;
+  if (!t) { void runMuse(r.kind, null, next); return; }
   const sec = song.sections.find((s) => s.id === t.sid);
   const line = sec && sec.takes[Math.min(sec.take, sec.takes.length - 1)].lines.find((l) => l.id === t.lid);
   if (!line) return;
@@ -217,17 +143,19 @@ export function applyWord(r: Results, next: string): void {
   setLineText(song.id, t.sid, t.lid, nt, { start: t.start, del: t.end - t.start, ins: word.length });
   focusLine(t.lid, t.start + word.length);
   feel('chk', 'medium');
-  results.value = { ...r, target: { ...t, end: t.start + word.length, word } };
+  results.value = { ...r, target: { ...t, end: t.start + word.length, word }, word };
 }
 
-export function ResultsTray() {
+export function WordsTray() {
   const r = results.value;
   const f = filters.value;
   void cmuTick.value;
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => { box.current?.scrollTo({ top: 0 }); }, [r?.kind, r?.target.word]);
+  const [q, setQ] = useState('');
+  useEffect(() => { box.current?.scrollTo({ top: 0 }); }, [r?.kind, r?.word]);
   if (!r) return null;
-  const tInfo = wordInfo(r.target.word.toLowerCase());
+  const w = r.word ?? r.target?.word ?? '';
+  const tInfo = wordInfo(w.toLowerCase());
   const pass = (i: Item) => (!f.syl || i.syl === tInfo.syl) && (!f.stress || i.stress === tInfo.stress);
   const sorted = (items: Item[]) => {
     const list = items.filter(pass);
@@ -235,22 +163,35 @@ export function ResultsTray() {
   };
   const toggle = (k: 'syl' | 'stress' | 'rare') => { filters.value = { ...f, [k]: !f[k] }; feel('click', 'light'); };
   const total = r.groups.reduce((n, g) => n + sorted(g.items).length, 0);
+  const lookup = (e?: Event) => { e?.preventDefault(); if (q.trim()) { void runMuse(r.kind, null, q.trim()); setQ(''); (document.activeElement as HTMLElement)?.blur?.(); } };
   return (
-    <div class="tray results">
+    <div class="tray words">
       <div class="tray-head">
-        <span class="tray-title">{TITLES[r.kind]} · <b>{r.target.word}</b> <small>{tInfo.syl}σ</small></span>
+        <span class="tray-title">{w ? <><b>{w}</b> <small>{tInfo.syl}σ · {tInfo.stress.replace(/S/g, '/').replace(/[us]/g, '˘')}</small></> : 'LOOK UP A WORD'}</span>
         <span class="grow" />
-        {r.kind !== 'define' && (
+        {r.kind !== 'define' && w && (
           <>
-            <button class={'tog' + (f.syl ? ' on' : '')} onClick={() => toggle('syl')}>={tInfo.syl}σ</button>
+            <button class={'tog' + (f.syl ? ' on' : '')} onClick={() => toggle('syl')}>={tInfo.syl} SYL</button>
             <button class={'tog' + (f.stress ? ' on' : '')} onClick={() => toggle('stress')}>STRESS</button>
             <button class={'tog' + (f.rare ? ' on' : '')} onClick={() => toggle('rare')}>RARE</button>
           </>
         )}
-        <button class="tog" aria-label="Close" onClick={() => { tray.value = null; }}><Icon n="close" size={14} /></button>
+        <button class="tog" aria-label="Close" onClick={() => { tray.value = null; }}><Icon n="close" size={13} /></button>
       </div>
+      <div class="tabs" role="tablist">
+        {TABS.map((t) => (
+          <button key={t.kind} role="tab" aria-selected={r.kind === t.kind} class={r.kind === t.kind ? 'on' : ''}
+            onClick={() => { feel('click', 'light'); if (w) void runMuse(t.kind, r.target, r.target ? undefined : w); else { lastKind = t.kind; results.value = { ...r, kind: t.kind }; } }}>{t.label}</button>
+        ))}
+      </div>
+      {!r.target && (
+        <form class="lookup" onSubmit={lookup}>
+          <input class="field ui" placeholder={w ? 'another word…' : 'type a word…'} value={q} enterKeyHint="search" onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+          <button class="btn small" type="submit"><Icon n="search" size={13} /></button>
+        </form>
+      )}
       <div class="tray-body" ref={box}>
-        {r.loading && <div class="tray-note"><span class="led on amber blink" /> CONSULTING…</div>}
+        {r.loading && <div class="tray-note"><span class="led on amber blink" /> LOOKING…</div>}
         {r.note && <div class="tray-note">{r.note}</div>}
         {r.groups.map((g) => (
           <div key={g.title}>
@@ -262,7 +203,9 @@ export function ResultsTray() {
             </div>
           </div>
         ))}
-        {!r.loading && !r.note && r.kind !== 'define' && total === 0 && <div class="tray-note">NOTHING MATCHES THOSE FILTERS</div>}
+        {!r.loading && !r.note && w && r.kind !== 'define' && total === 0 && <div class="tray-note">NOTHING MATCHES — TRY ANOTHER TAB OR TURN A FILTER OFF</div>}
+        {!w && <div class="tray-note">PUT THE CARET IN A WORD AND PRESS WORDS — OR TYPE ONE ABOVE</div>}
+        {r.target && <div class="tray-foot">TAP A WORD TO SWAP IT INTO THE LINE</div>}
         {r.def && (
           <div class="defs">
             <div class="dw">{r.def.word} <small>{r.def.phonetic}</small></div>

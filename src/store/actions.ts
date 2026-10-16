@@ -69,8 +69,8 @@ export function pendingPencil(song: Song | null): number {
   return song ? song.roll.marks.filter((m) => m.kind === 'pencil' && !m.punched).length : 0;
 }
 
-/** Cut a line out of a take into the Boneyard. */
-export function buryLine(songId: ID, sectionId: ID, lineId: ID): { text: string; undo: () => void } | null {
+/** Cut a line out of a take into the Shoebox. */
+export function cutLine(songId: ID, sectionId: ID, lineId: ID): { text: string; undo: () => void } | null {
   const song = currentSong.value;
   const sec = song?.sections.find((s) => s.id === sectionId);
   if (!song || !sec) return null;
@@ -79,7 +79,7 @@ export function buryLine(songId: ID, sectionId: ID, lineId: ID): { text: string;
   if (idx < 0) return null;
   const line = take.lines[idx];
   const text = line.text.trim();
-  const scrap = text ? addScrap(text, 'bone', songId) : null;
+  const scrap = text ? addScrap(text, 'cut', songId) : null;
   updateSong(songId, (d) => {
     const t = activeTake(d.sections.find((s) => s.id === sectionId)!);
     t.lines.splice(idx, 1);

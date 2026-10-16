@@ -1,17 +1,17 @@
 // Tiny promise wrapper around IndexedDB with an in-memory fallback.
 const DB_NAME = 'portascribe';
-const STORES = ['songs', 'scraps', 'blobs', 'kv'] as const;
+const STORES = ['songs', 'scraps', 'blobs', 'kv', 'history'] as const;
 type StoreName = (typeof STORES)[number];
 
 let dbp: Promise<IDBDatabase | null> | null = null;
 const mem: Record<StoreName, Map<string, unknown>> = {
-  songs: new Map(), scraps: new Map(), blobs: new Map(), kv: new Map(),
+  songs: new Map(), scraps: new Map(), blobs: new Map(), kv: new Map(), history: new Map(),
 };
 
 function open(): Promise<IDBDatabase | null> {
   dbp ??= new Promise((resolve) => {
     try {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, 2);
       req.onupgradeneeded = () => {
         for (const s of STORES) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s);
       };
@@ -51,6 +51,16 @@ export async function dbAll<T>(store: StoreName): Promise<T[]> {
   const db = await open();
   if (!db) return [...mem[store].values()] as T[];
   return wrap<T[]>(db.transaction(store).objectStore(store).getAll());
+}
+
+/** All values whose key starts with `prefix` (keys sort as strings). */
+export async function dbPrefix<T>(store: StoreName, prefix: string): Promise<Array<{ key: string; value: T }>> {
+  const db = await open();
+  if (!db) return [...mem[store].entries()].filter(([k]) => k.startsWith(prefix)).sort(([a], [b]) => (a < b ? -1 : 1)).map(([key, value]) => ({ key, value: value as T }));
+  const range = IDBKeyRange.bound(prefix, prefix + '\uffff');
+  const os = db.transaction(store).objectStore(store);
+  const [keys, values] = await Promise.all([wrap(os.getAllKeys(range)), wrap(os.getAll(range))]);
+  return keys.map((k, i) => ({ key: String(k), value: values[i] as T }));
 }
 
 export const kvGet = <T>(k: string) => dbGet<T>('kv', k);

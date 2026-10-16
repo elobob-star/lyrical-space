@@ -111,3 +111,22 @@ export function offlineRhymes(word: string, mode: 'perfect' | 'slant', max = 80)
   return res.slice(0, max);
 }
 
+
+/**
+ * Rhyme-scheme letters (A, B, A, B…) for a section, from the end words.
+ * Lines whose last word shares a perfect or slant group get the same letter; unrhymed lines get their own.
+ */
+export function rhymeScheme(lines: string[], marks: RhymeMark[][]): string[] {
+  const letterOf = new Map<number, string>();
+  let next = 0;
+  const fresh = () => String.fromCharCode(65 + (next++ % 26));
+  return lines.map((text, i) => {
+    const toks = tokenize(text);
+    const last = toks[toks.length - 1];
+    if (!last) return '';
+    const m = marks[i]?.find((x) => x.start === last.start);
+    if (!m) return fresh();
+    if (!letterOf.has(m.group)) letterOf.set(m.group, fresh());
+    return letterOf.get(m.group)!;
+  });
+}

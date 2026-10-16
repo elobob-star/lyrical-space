@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { currentSong, removeScrap, scraps, updateScrap } from '../../store/state';
+import { currentSong, putBackScrap, removeScrap, scraps, updateScrap } from '../../store/state';
 import { MODIFIERS, diatonic, keyName, modifyChord, parseKey } from '../../engine/music';
 import { focused, addLineAfter, focusLine, setLineText } from '../../store/lines';
 import { activeTake } from '../../store/models';
@@ -24,7 +24,7 @@ export function ChordTray() {
         <span class="tray-title">CHORD STAMPS · <b>{key ? keyName(key) : 'COMMON'}</b>{song.capo ? <small> CAPO {song.capo}</small> : null}</span>
         <span class="grow" />
         <button class="tog" onClick={() => (deckSheet.value = 'key')}>KEY</button>
-        <button class="tog" aria-label="Close" onClick={() => { tray.value = null; armedChord.value = null; }}><Icon n="close" size={14} /></button>
+        <button class="tog" aria-label="Close" onClick={() => { tray.value = null; armedChord.value = null; }}><Icon n="close" size={13} /></button>
       </div>
       <div class="stamp-grid">
         {stamps.map((s) => (
@@ -75,7 +75,7 @@ function context() {
   return { syl: cur && cur.text.trim() ? lineInfo(cur.text).syl : 0, keys };
 }
 
-export function insertBone(text: string): void {
+export function insertScrap(text: string): void {
   const song = currentSong.value;
   if (!song) return;
   const f = focused.value;
@@ -95,12 +95,16 @@ export function insertBone(text: string): void {
   }
 }
 
-export function BoneTray() {
+const FROM: Record<string, string> = { catch: 'CAUGHT', cut: 'CUT', table: 'TABLE', roll: 'ROLL' };
+
+/** The Shoebox, opened over the Bench: MATCH ranks scraps by rhyme with the line above and fit to this line's length. */
+export function ShoeboxTray() {
   void cmuTick.value;
   const [tab, setTab] = useState<'match' | 'all'>('match');
-  const bones = scraps.value.filter((s) => s.kind === 'bone');
+  const all = scraps.value;
+  const song = currentSong.value;
   const ctx = context();
-  const scored = bones.map((b) => {
+  const scored = all.map((b) => {
     const info = lineInfo(b.text);
     const last = info.tokens[info.tokens.length - 1];
     const ph = last && wordInfo(last.norm).phones;
@@ -111,27 +115,27 @@ export function BoneTray() {
     return { b, info, rhymes, d, score };
   });
   const matches = scored.filter((s) => s.rhymes || s.d <= 1).sort((a, b) => b.score - a.score);
-  const showing = tab === 'match' && matches.length === 0 && bones.length > 0 ? 'all' : tab;
+  const showing = tab === 'match' && matches.length === 0 && all.length > 0 ? 'all' : tab;
   const list = showing === 'match' ? matches : [...scored].sort((a, b) => b.b.createdAt - a.b.createdAt);
   return (
-    <div class="tray bones">
+    <div class="tray shoebox">
       <div class="tray-head">
-        <span class="tray-title">BONEYARD · <b>{bones.length}</b></span>
+        <span class="tray-title"><b>SHOEBOX</b> <small>{all.length} SCRAPS{ctx.syl ? ` · LINE ${ctx.syl}σ` : ''}</small></span>
         <span class="grow" />
         <button class={'tog' + (tab === 'match' ? ' on' : '')} onClick={() => setTab('match')}>MATCH {matches.length}</button>
         <button class={'tog' + (tab === 'all' ? ' on' : '')} onClick={() => setTab('all')}>ALL</button>
-        <button class="tog" aria-label="Close" onClick={() => { tray.value = null; }}><Icon n="close" size={14} /></button>
+        <button class="tog" aria-label="Close" onClick={() => { tray.value = null; }}><Icon n="close" size={13} /></button>
       </div>
       <div class="tray-body">
-        {bones.length === 0 && <div class="tray-note">NOTHING BURIED YET — SWIPE A LINE LEFT TO FLICK IT HERE</div>}
+        {all.length === 0 && <div class="tray-note">EMPTY — CATCH LINES WITH THE TAB ON THE RIGHT, OR SWIPE A LINE LEFT TO CUT IT HERE</div>}
         {tab === 'match' && showing === 'all' && <div class="tray-note">NOTHING FITS {ctx.syl ? `${ctx.syl}σ ` : ''}OR RHYMES HERE YET — SHOWING EVERYTHING</div>}
         {list.map(({ b, info, rhymes }) => (
-          <div class="bone" key={b.id}>
-            <button class="btxt" onClick={() => { insertBone(b.text); updateScrap(b.id, { used: b.used + 1 }); feel('chk', 'medium'); }}>
+          <div class="scrap-row" key={b.id}>
+            <button class="scrap-txt" onClick={() => { insertScrap(b.text); updateScrap(b.id, { used: b.used + 1 }); feel('chk', 'medium'); }}>
               <span>{b.text}</span>
-              <small>{info.syl}σ{rhymes ? ' · rhymes' : ''}</small>
+              <small>{info.syl}σ{rhymes ? ' · RHYMES' : ''} · {FROM[b.from] ?? 'CAUGHT'}{b.songId && b.songId !== song?.id ? ' ELSEWHERE' : ''}</small>
             </button>
-            <button class="bx" aria-label="Remove bone" onClick={() => { const copy = b; removeScrap(b.id); say('BONE REMOVED', { label: 'UNDO', run: () => { scraps.value = [copy, ...scraps.value]; } }); }}><Icon n="close" size={13} /></button>
+            <button class="scrap-x" aria-label="Remove from the shoebox" onClick={() => { const copy = b; removeScrap(b.id); say('SCRAP THROWN AWAY', { label: 'UNDO', run: () => putBackScrap(copy) }); }}><Icon n="close" size={12} /></button>
           </div>
         ))}
       </div>

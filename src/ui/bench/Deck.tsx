@@ -2,9 +2,9 @@ import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { currentSong, saveBlob, deleteBlob, updateCurrent } from '../../store/state';
 import { ID, Memo, uid } from '../../store/models';
-import { ROOTS, TUNINGS, keyName, parseKey } from '../../engine/music';
+import { ROOTS, TUNINGS, isFlatKey, keyName, parseKey, semisBetween, transposeChord } from '../../engine/music';
 import { feel, metronomeOn, startMetronome, stopMetronome } from '../../engine/feel';
-import { recLevel, recording, startRecording, stopRecording } from '../../engine/recorder';
+import { cancelRecording, recLevel, recording, startRecording, stopRecording } from '../../engine/recorder';
 import { loopIds, playProgress, playingId, stopMemo, toggleLoop, togglePlay } from '../../engine/memoPlayer';
 import { say } from '../../store/ui';
 import { Icon } from '../icons';
@@ -32,15 +32,7 @@ export async function toggleRecord(target: ID | 'song'): Promise<void> {
     const res = await stopRecording();
     if (metronomeOn() && metro.value) { stopMetronome(); metro.value = false; }
     if (!res || res.durMs < 400) { say('TOO SHORT — NOT KEPT'); return; }
-    const id = uid();
-    await saveBlob(id, res.blob);
-    const sectionId = recTarget.value === 'song' ? undefined : (recTarget.value as ID);
-    updateCurrent((d) => {
-      const n = d.memos.length + 1;
-      d.memos.push({ id, sectionId, label: `TAKE ${String(n).padStart(2, '0')}`, durMs: res.durMs, peaks: res.peaks, mime: res.mime, createdAt: Date.now() });
-    });
-    feel('rec', 'medium');
-    say('TAPE SAVED', { label: 'PLAY', run: () => { const m = currentSong.peek()?.memos.find((x) => x.id === id); if (m) void togglePlay(m); } });
+    await keepMemo(uid(), res, recTarget.value === 'song' ? undefined : (recTarget.value as ID));
     return;
   }
   recTarget.value = target;
@@ -62,6 +54,43 @@ export async function toggleRecord(target: ID | 'song'): Promise<void> {
   } catch {
     say('MIC BLOCKED — ALLOW MICROPHONE ACCESS IN ANDROID SETTINGS');
   }
+}
+
+async function keepMemo(id: ID, res: { blob: Blob; durMs: number; peaks: number[]; mime: string }, sectionId?: ID): Promise<void> {
+  await saveBlob(id, res.blob);
+  updateCurrent((d) => {
+    const n = d.memos.filter((m) => (m.sectionId ?? null) === (sectionId ?? null)).length + 1;
+    d.memos.push({ id, sectionId, label: (sectionId ? 'HUM ' : 'TAKE ') + String(n).padStart(2, '0'), durMs: res.durMs, peaks: res.peaks, mime: res.mime, createdAt: Date.now() });
+  });
+  feel('rec', 'medium');
+  say(sectionId ? 'MELODY KEPT ON THIS CARD' : 'TAPE SAVED', { label: 'PLAY', run: () => { const m = currentSong.peek()?.memos.find((x) => x.id === id); if (m) void togglePlay(m); } });
+}
+
+/** Press and hold a card's mic to hum how it goes; let go to keep it. */
+export function humHandlers(sectionId: ID) {
+  let held = false, started = false, t0 = 0;
+  const down = (e: PointerEvent) => {
+    if (recording.peek() && recTarget.peek() === 'song') { say('THE SCRATCH TAPE IS ROLLING'); return; }
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* */ }
+    held = true; started = false; t0 = performance.now();
+    stopMemo();
+    recTarget.value = sectionId;
+    feel('rec', 'medium');
+    startRecording().then(() => {
+      started = true;
+      recStarted.value = Date.now();
+      if (!held) void finish();
+    }).catch(() => { held = false; say('MIC BLOCKED — ALLOW MICROPHONE ACCESS'); });
+  };
+  const finish = async () => {
+    if (!started) return;
+    if (performance.now() - t0 < 450) { cancelRecording(); say('HOLD THE MIC AND HUM — LET GO TO KEEP IT'); return; }
+    const res = await stopRecording();
+    if (!res || res.durMs < 400) { say('TOO SHORT — NOT KEPT'); return; }
+    await keepMemo(uid(), res, sectionId);
+  };
+  const up = () => { if (!held) return; held = false; void finish(); };
+  return { onPointerDown: down, onPointerUp: up, onPointerCancel: up, onContextMenu: (e: Event) => e.preventDefault() };
 }
 
 export function tuningShort(t: string): string {
@@ -91,8 +120,8 @@ export function Deck() {
         <button class={'dchip dtog' + (metro.value ? ' on' : '')} onClick={() => { feel('click'); toggleMetronome(); }} aria-label="Metronome">
           <Icon n="metro" size={15} /><span class={'beat' + (flash % 2 ? ' a' : ' b')} />
         </button>
-        <button class={'dchip dtog rec' + (rec && recTarget.value === 'song' ? ' on' : '')} onClick={() => void toggleRecord('song')} aria-label="Record loop">
-          <Icon n={rec && recTarget.value === 'song' ? 'stop' : 'rec'} size={15} />
+        <button class={'dchip dtog rec' + (rec && recTarget.value === 'song' ? ' on' : '')} onClick={() => void toggleRecord('song')} aria-label="Record scratch tape">
+          <span class={'reels' + (rec && recTarget.value === 'song' ? ' spin' : playingId.value && song.memos.some((m) => m.id === playingId.value && !m.sectionId) ? ' spin' : '')}><i /><i /></span>
           {rec && recTarget.value === 'song' ? <b>{mmss(Date.now() - recStarted.value)}</b> : <b>REC</b>}
         </button>
       </div>
@@ -156,14 +185,34 @@ function KeySheet() {
   const song = currentSong.value!;
   const key = parseKey(song.key);
   const [minor, setMinor] = useState(key?.minor ?? false);
+  const hasChords = song.sections.some((sec) => sec.takes.some((t) => t.lines.some((l) => l.chords.length)));
+  const [move, setMove] = useState(true);
   const close = () => (deckSheet.value = null);
+  const pick = (r: string) => {
+    const next = parseKey(r + (minor ? 'm' : ''))!;
+    const semis = key && hasChords && move ? semisBetween(key, next) : 0;
+    const flat = isFlatKey(next);
+    updateCurrent((d) => {
+      d.key = keyName(next);
+      if (!semis) return;
+      for (const sec of d.sections) for (const t of sec.takes) for (const l of t.lines) for (const c of l.chords) c.name = transposeChord(c.name, semis, flat);
+    });
+    feel('click');
+    if (semis) say(`TRANSPOSED ${semis > 0 ? '+' : ''}${semis} → ${keyName(next)}`);
+    close();
+  };
   return (
     <Sheet title="KEY" onClose={close} right={<button class="btn small" onClick={() => { updateCurrent((d) => { d.key = null; }); close(); }}>CLEAR</button>}>
       <div class="seg"><button class={!minor ? 'on' : ''} onClick={() => setMinor(false)}>MAJOR</button><button class={minor ? 'on' : ''} onClick={() => setMinor(true)}>MINOR</button></div>
-      <div class="grid4">
+      {key && hasChords && (
+        <button class="dip-row" role="switch" aria-checked={move} onClick={() => { feel('click'); setMove(!move); }}>
+          <span class={'dip' + (move ? ' on' : '')}><i /></span>
+          <span class="dl"><b>MOVE THE CHORDS TOO</b><small>transpose every stamp into the new key</small></span>
+        </button>
+      )}
+      <div class="grid4" style={{ marginTop: '10px' }}>
         {ROOTS.map((r) => (
-          <button class={'cell' + (key && key.root === r && key.minor === minor ? ' on' : '')} key={r}
-            onClick={() => { feel('click'); updateCurrent((d) => { d.key = r + (minor ? 'm' : ''); }); close(); }}>{r}{minor ? 'm' : ''}</button>
+          <button class={'cell' + (key && key.root === r && key.minor === minor ? ' on' : '')} key={r} onClick={() => pick(r)}>{r}{minor ? 'm' : ''}</button>
         ))}
       </div>
     </Sheet>
