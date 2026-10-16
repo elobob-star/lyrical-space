@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'preact/hooks';
-import { feel } from '../engine/feel';
 
 const POS = [-50, 0, 50];
 
@@ -28,7 +27,7 @@ export function Dial({ value, onChange }: { value: number; onChange: (v: number)
     const a = Math.max(-62, Math.min(62, (Math.atan2(dx, -dy) * 180) / Math.PI));
     setAngle(a);
     const idx = POS.reduce((best, p, i) => (Math.abs(p - a) < Math.abs(POS[best] - a) ? i : best), 0);
-    if (idx !== s.idx) { s.idx = idx; feel('click', 'light'); onChange(idx); }
+    if (idx !== s.idx) { s.idx = idx; onChange(idx); }
   };
   const up = () => {
     const s = st.current;
@@ -37,7 +36,6 @@ export function Dial({ value, onChange }: { value: number; onChange: (v: number)
     root.current?.classList.remove('drag');
     if (!s.moved && Date.now() - s.t < 400) {
       const next = (value + 1) % 3;
-      feel('click', 'light');
       onChange(next);
       setAngle(POS[next]);
     } else setAngle(POS[s.idx]); // springs into the detent
@@ -49,7 +47,7 @@ export function Dial({ value, onChange }: { value: number; onChange: (v: number)
       <div class="d-well" />
       <svg class="d-ticks" viewBox="-33 -33 66 66" aria-hidden="true">
         {POS.map((p, i) => (
-          <line x1="0" y1="-30" x2="0" y2="-26.6" stroke={i === value ? '#ff5b1f' : '#8d8f96'} stroke-width="2" stroke-linecap="round" transform={`rotate(${p})`} />
+          <line x1="0" y1="-32.5" x2="0" y2="-29" class={i === value ? 'tk on' : 'tk'} stroke-width="2" stroke-linecap="round" transform={`rotate(${p})`} />
         ))}
       </svg>
       <div class="d-metal" />

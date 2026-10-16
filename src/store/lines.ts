@@ -208,7 +208,7 @@ export function moveEntry(songId: ID, entryId: ID, dir: -1 | 1): void {
   });
 }
 
-/** Remove an entry; if it was the last use of its section, the section's lines go to the Boneyard. */
+/** Remove an entry; if it was the last use of its section, the section's lines go to the Shoebox. */
 export function removeEntry(songId: ID, entryId: ID): { undo: () => void; buried: number } | null {
   const song = currentSong.value;
   if (!song) return null;
@@ -219,7 +219,7 @@ export function removeEntry(songId: ID, entryId: ID): { undo: () => void; buried
   const sec = song.sections.find((s) => s.id === entry.sectionId);
   const bones: ID[] = [];
   if (last && sec) {
-    for (const t of sec.takes) for (const l of t.lines) if (l.text.trim()) { const s = addScrap(l.text, 'bone', songId); if (s) bones.push(s.id); }
+    for (const t of sec.takes) for (const l of t.lines) if (l.text.trim()) { const s = addScrap(l.text, 'cut', songId); if (s) bones.push(s.id); }
   }
   updateSong(songId, (d) => {
     d.arrangement = d.arrangement.filter((a) => a.id !== entryId);

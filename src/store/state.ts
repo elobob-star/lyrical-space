@@ -2,9 +2,10 @@ import { computed, effect, signal } from '@preact/signals';
 import { produce, setAutoFreeze } from 'immer';
 import { dbAll, dbDelete, dbGet, dbPut, kvGet, kvSet, persistRequest } from './db';
 import {
-  DEFAULT_SETTINGS, ID, Scrap, Settings, Song, newSong, uid,
+  DEFAULT_SETTINGS, ID, Scrap, ScrapFrom, Settings, Song, newSong, normalizeScrap, uid,
 } from './models';
 import { seedScraps, seedSong } from './seed';
+import { dropHistory, forceSnapshot, maybeSnapshot } from './history';
 
 setAutoFreeze(false);
 
@@ -47,7 +48,30 @@ export function duplicateSong(id: ID): void {
   copy.title = src.title + ' (COPY)';
   copy.createdAt = copy.updatedAt = Date.now();
   copy.memos = [];
+  delete copy.deletedAt;
   songs.value = [copy, ...songs.value];
+}
+
+/** Put an old version back. The current state is snapshotted first, so restoring is itself undoable. */
+export async function restoreVersion(old: Song, asCopy: boolean): Promise<ID> {
+  const cur = songs.value.find((s) => s.id === old.id);
+  if (asCopy || !cur) {
+    const copy: Song = JSON.parse(JSON.stringify(old));
+    copy.id = uid();
+    copy.title = old.title + ' (' + new Date(old.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase() + ')';
+    copy.createdAt = copy.updatedAt = Date.now();
+    copy.memos = [];
+    delete copy.deletedAt;
+    songs.value = [copy, ...songs.value];
+    return copy.id;
+  }
+  await forceSnapshot(cur);
+  const back: Song = JSON.parse(JSON.stringify(old));
+  back.memos = cur.memos; // audio lives outside the snapshot
+  delete back.deletedAt;
+  back.updatedAt = Date.now();
+  songs.value = songs.value.map((s) => (s.id === old.id ? back : s));
+  return back.id;
 }
 
 export function binSong(id: ID): void {
@@ -62,15 +86,19 @@ export async function purgeSong(id: ID): Promise<void> {
   songs.value = songs.value.filter((x) => x.id !== id);
   s?.memos.forEach((m) => void dbDelete('blobs', m.id));
   await dbDelete('songs', id);
+  await dropHistory(id);
 }
 
-// ---------- scraps (shoebox + boneyard) ----------
-export function addScrap(text: string, kind: Scrap['kind'], songId?: ID): Scrap | null {
+// ---------- the Shoebox: one pile for every stray line ----------
+export function addScrap(text: string, from: ScrapFrom, songId?: ID): Scrap | null {
   const t = text.trim();
   if (!t) return null;
-  const s: Scrap = { id: uid(), text: t, kind, createdAt: Date.now(), songId, used: 0 };
+  const s: Scrap = { id: uid(), text: t, from, createdAt: Date.now(), songId, used: 0 };
   scraps.value = [s, ...scraps.value];
   return s;
+}
+export function putBackScrap(s: Scrap): void {
+  if (!scraps.value.some((x) => x.id === s.id)) scraps.value = [s, ...scraps.value];
 }
 export function updateScrap(id: ID, patch: Partial<Scrap>): void {
   scraps.value = scraps.value.map((s) => (s.id === id ? { ...s, ...patch } : s));
@@ -80,14 +108,21 @@ export function removeScrap(id: ID): void {
   void dbDelete('scraps', id);
 }
 
-export function drawSpark(): Scrap | null {
-  const sparks = scraps.value.filter((s) => s.kind === 'spark');
-  if (!sparks.length) return null;
-  const least = Math.min(...sparks.map((s) => s.used));
-  const pool = sparks.filter((s) => s.used === least);
-  const pick = pool[Math.floor(Math.random() * pool.length)];
-  updateScrap(pick.id, { used: pick.used + 1 });
-  return pick;
+/** Pull scraps out of the Shoebox at random, least-used first, never the one you just saw. */
+export function drawScraps(n: number, avoid: string[] = []): Scrap[] {
+  const pool = scraps.value.filter((s) => !avoid.includes(s.text));
+  const src = pool.length ? pool : scraps.value;
+  const out: Scrap[] = [];
+  const left = [...src];
+  while (out.length < n && left.length) {
+    const least = Math.min(...left.map((s) => s.used));
+    const tier = left.filter((s) => s.used <= least + 1);
+    const pick = tier[Math.floor(Math.random() * tier.length)];
+    out.push(pick);
+    left.splice(left.indexOf(pick), 1);
+  }
+  out.forEach((p) => updateScrap(p.id, { used: p.used + 1 }));
+  return out;
 }
 
 // ---------- settings ----------
@@ -103,6 +138,8 @@ let scrapTimer: ReturnType<typeof setTimeout> | undefined;
 let booted = false;
 
 function flushSong(s: Song): void {
+  const prev = savedRefs.get(s.id);
+  if (prev && prev !== s) void maybeSnapshot(prev);
   savedRefs.set(s.id, s);
   saving.value = true;
   dbPut('songs', s.id, s).finally(() => { saving.value = false; });
@@ -138,9 +175,14 @@ export async function boot(): Promise<void> {
   loaded = loaded.filter((x) => !(x.deletedAt && x.deletedAt < cutoff));
   loaded.sort((a, b) => b.updatedAt - a.updatedAt);
   loaded.forEach((s) => savedRefs.set(s.id, s));
-  loadedScraps.forEach((s) => savedScraps.set(s.id, s));
+  loadedScraps = loadedScraps.map((s) => {
+    const n = normalizeScrap(s);
+    if (n === s) savedScraps.set(s.id, s); // migrated scraps get re-saved by the effect below
+    return n;
+  });
   songs.value = loaded;
   scraps.value = loadedScraps.sort((a, b) => b.createdAt - a.createdAt);
+  migrateSongs();
   if (st) settings.value = { ...DEFAULT_SETTINGS, ...st };
   const live = loaded.filter((s) => !s.deletedAt);
   currentId.value = live.find((s) => s.id === meta?.currentId)?.id ?? live[0]?.id ?? null;
@@ -176,12 +218,36 @@ export async function boot(): Promise<void> {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAll(); });
 }
 
-/** Replace the whole library (backup restore). */
+/** Older builds stored strips/lines with handwriting-only fields; nothing to fix yet — hook for future migrations. */
+function migrateSongs(): void { /* v0.2: schema compatible */ }
+
+const blobToDataUrl = (b: Blob) => new Promise<string>((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error);
+  r.readAsDataURL(b);
+});
+
+/** Whole library as one JSON file — including voice memos (base64). */
+export async function backupAll(): Promise<string> {
+  const live = songs.value.filter((s) => !s.deletedAt);
+  const blobs: Record<string, string> = {};
+  for (const s of live) for (const m of s.memos) {
+    const b = await dbGet<Blob>('blobs', m.id);
+    if (b) blobs[m.id] = await blobToDataUrl(b);
+  }
+  return JSON.stringify({ app: 'portascribe', version: 2, exportedAt: new Date().toISOString(), songs: live, scraps: scraps.value, blobs });
+}
+
+/** Merge a backup into the library. */
 export async function importBackup(json: string): Promise<{ songs: number; scraps: number }> {
   const data = JSON.parse(json);
   if (data?.app !== 'portascribe') throw new Error('Not a Portascribe backup');
   const inSongs: Song[] = data.songs ?? [];
-  const inScraps: Scrap[] = data.scraps ?? [];
+  const inScraps: Scrap[] = (data.scraps ?? []).map(normalizeScrap);
+  const blobs: Record<string, string> = data.blobs ?? {};
+  for (const [id, url] of Object.entries(blobs)) {
+    try { await dbPut('blobs', id, await (await fetch(url)).blob()); } catch { /* skip a bad memo */ }
+  }
   const known = new Set(songs.value.map((s) => s.id));
   const merged = [...songs.value];
   for (const s of inSongs) {

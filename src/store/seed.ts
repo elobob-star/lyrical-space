@@ -34,14 +34,15 @@ export function seedSong(): Song {
     { id: uid(), sectionId: chorus.id },
   ];
   song.roll.text =
-    'This is the roll. Type fast, don\'t fix anything. Flip the amber LATCH and backspace turns into ghost ink — ' +
-    'nothing you write is ever lost.\n\nWhen you\'re done, switch to the GREASE pencil, press-and-drag over the lines that glow, ' +
-    'then hit PUNCH. They land on the TABLE as strips you can cut up and re-shuffle, and from there they slot into the BENCH.\n';
+    'This is the Roll — cheap paper, one long scroll. Type fast and keep going. ' +
+    'Backspace never erases a finished word here: it strikes it through, so nothing is lost.\n\n' +
+    'Flip the LATCH and the carriage only goes forward: no backspace, and the lines behind you fold away so you can\'t reread and judge.\n\n' +
+    'Later, pick up the PEN and tap the lines that glow, then PUNCH them out onto the TABLE.\n';
   song.roll.marks = [];
   return song;
 }
 
-const SPARKS = [
+const CAUGHT = [
   'the moon is a coin I never spent',
   'your name in the steam on the bus window',
   'a bridge that only exists in fog',
@@ -52,9 +53,14 @@ const SPARKS = [
   'the last good song on the last bad night',
 ];
 
+const CUT = ['the jukebox only knows one sad song', 'a key that fits a house we sold'];
+
 export function seedScraps(): Scrap[] {
   const now = Date.now();
-  return SPARKS.map((text, i) => ({ id: uid(), text, kind: 'spark' as const, createdAt: now - i * 1000, used: 0 }));
+  return [
+    ...CAUGHT.map((text, i) => ({ id: uid(), text, from: 'catch' as const, createdAt: now - i * 3_600_000, used: 0 })),
+    ...CUT.map((text, i) => ({ id: uid(), text, from: 'cut' as const, createdAt: now - (i + 9) * 3_600_000, used: 0 })),
+  ];
 }
 
 export { newLine };

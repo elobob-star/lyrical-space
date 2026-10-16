@@ -45,6 +45,21 @@ const P: Record<string, JSX.Element> = {
   up2: <><path d="M12 19V5M6 11l6-6 6 6" /></>,
   down2: <><path d="M12 5v14M6 13l6 6 6-6" /></>,
   box: <><path d="M3 8l9-4 9 4v10l-9 4-9-4z" /><path d="M3 8l9 4 9-4M12 12v10" /></>,
+  eject: <><path d="M12 5l7 8H5z" /><path d="M5 18h14" /></>,
+  timer: <><circle cx="12" cy="13.5" r="7.5" /><path d="M12 13.5V9.5M10 2.5h4M18.5 6.5l1.5-1.5" /></>,
+  stand: <><path d="M4 4h16v9H4zM12 13v8M8 21h8M7 7.5h10M7 10h7" /></>,
+  lens: <><circle cx="12" cy="12" r="8.5" /><path d="M7 10h10M6 14h12" /></>,
+  words: <><path d="M3 5.5h6.5a2.5 2.5 0 0 1 2.5 2.5v11a2 2 0 0 0-2-2H3zM21 5.5h-6.5A2.5 2.5 0 0 0 12 8v11a2 2 0 0 1 2-2h7z" /></>,
+  cutup: <><circle cx="6" cy="17" r="2.4" /><circle cx="15" cy="17" r="2.4" /><path d="M7.6 15.3L17 4M13.4 15.3L4 4" /><path d="M19 9h2M19 13h2M18 17h3" /></>,
+  sweep: <><path d="M4 6h10M4 10h7M4 14h4" /><path d="M17 4v12M13.5 12.5L17 16l3.5-3.5" /><path d="M4 20h16" /></>,
+  draw: <><rect x="5" y="9" width="14" height="11" rx="1" /><path d="M12 2.5V12M8.5 6L12 2.5 15.5 6" /></>,
+  slip: <><path d="M5 4h10l4 4v12H5z" /><path d="M15 4v4h4M12 11v6M9 14h6" /></>,
+  history: <><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" /><path d="M3 4v4.5h4.5M12 7.5V12l3 2" /></>,
+  import: <><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5" /><path d="M4 15v5h16v-5" /></>,
+  dots: <><circle cx="5.5" cy="12" r="1.3" fill="currentColor" /><circle cx="12" cy="12" r="1.3" fill="currentColor" /><circle cx="18.5" cy="12" r="1.3" fill="currentColor" /></>,
+  minus: <><path d="M5 12h14" /></>,
+  pause: <><rect x="6.5" y="5" width="3.5" height="14" rx="1" fill="currentColor" /><rect x="14" y="5" width="3.5" height="14" rx="1" fill="currentColor" /></>,
+  bin: <><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" /></>,
 };
 
 export function Icon({ n, size = 20, class: cls, stroke = 1.7 }: { n: keyof typeof P | string; size?: number; class?: string; stroke?: number }) {

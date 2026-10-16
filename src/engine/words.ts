@@ -1,4 +1,5 @@
 import { lookup } from './cmu';
+import type { MeterMark } from '../store/models';
 import { countVowels, stresses } from './phones';
 
 export interface Token {
@@ -84,22 +85,51 @@ export function wordInfo(norm: string): WordInfo {
 /** Drop caches (call after the dictionary finishes loading so guesses get replaced). */
 export function resetWordCache(): void { infoCache.clear(); }
 
+export interface WordMeter {
+  tok: Token;
+  key: string;
+  /** stress actually used (override or dictionary) */
+  stress: string;
+  auto: string;
+  overridden: boolean;
+  down: boolean;
+}
+
 export interface LineInfo {
   syl: number;
   stress: string;
   tokens: Token[];
+  words: WordMeter[];
 }
 
-export function lineInfo(text: string): LineInfo {
+export const meterKey = (i: number, t: Token) => `${i}:${t.norm}`;
+
+export function lineInfo(text: string, meter?: Record<string, MeterMark>): LineInfo {
   const tokens = tokenize(text);
   let syl = 0;
   let stress = '';
-  for (const t of tokens) {
+  const words: WordMeter[] = [];
+  tokens.forEach((t, i) => {
     const w = wordInfo(t.norm);
+    const key = meterKey(i, t);
+    const o = meter?.[key];
+    const st = o?.s && o.s.length === w.stress.length ? o.s : w.stress;
     syl += w.syl;
-    stress += w.stress;
-  }
-  return { syl, stress, tokens };
+    stress += st;
+    words.push({ tok: t, key, stress: st, auto: w.stress, overridden: st !== w.stress, down: !!o?.d });
+  });
+  return { syl, stress, tokens, words };
+}
+
+/**
+ * One tap on a word in the METER lens: dictionary stress → flipped (one-syllable words only,
+ * where context decides) → downbeat bar before the word → back to the dictionary.
+ */
+export function nextMeter(w: WordMeter): MeterMark | undefined {
+  const flip = w.auto.length === 1 ? (w.auto === 'S' ? 'u' : 'S') : null;
+  if (!w.overridden && !w.down) return flip ? { s: flip } : { d: 1 };
+  if (w.overridden && !w.down) return { d: 1 };
+  return undefined;
 }
 
 /** "da-DUM-da-da-DUM" rendering of a stress string. */

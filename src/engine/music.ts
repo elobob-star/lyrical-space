@@ -70,3 +70,11 @@ export const TUNINGS = [
 ];
 
 export const CHORD_RE = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?[0-9]*(sus[24]|add[0-9]+|maj[0-9]+|dim|aug)?(\/[A-G][#b]?)?$/;
+
+export const isFlatKey = (k: Key | null): boolean => !!k && FLAT_KEYS.has(keyName(k));
+
+/** Shortest move (−5…+6 semitones) from one key's root to another's. */
+export function semisBetween(from: Key, to: Key): number {
+  const d = (((semitone(to.root) - semitone(from.root)) % 12) + 12) % 12;
+  return d > 6 ? d - 12 : d;
+}

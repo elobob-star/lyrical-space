@@ -1,18 +1,20 @@
 import { memo } from 'preact/compat';
 import { useEffect, useRef } from 'preact/hooks';
+import { signal } from '@preact/signals';
 import { Chord, ID, Line } from '../../store/models';
 import { RhymeMark } from '../../engine/rhyme';
 import { diffEdit } from '../../engine/textdiff';
+import { WordMeter, nextMeter } from '../../engine/words';
 import {
   focusReq, focused, mergeUp, pasteLines, placeChord, removeChord, removeLine, setLineText, splitLine, focusLine,
 } from '../../store/lines';
-import { currentSong } from '../../store/state';
-import { buryLine } from '../../store/actions';
+import { updateSong } from '../../store/state';
+import { cutLine } from '../../store/actions';
 import { feel, haptic } from '../../engine/feel';
-import { say } from '../../store/ui';
+import { Lens, say } from '../../store/ui';
+import { activeTake } from '../../store/models';
 import { Icon } from '../icons';
 import { armedChord, charAt, startChordDrag } from './chordDrag';
-import { signal } from '@preact/signals';
 
 export const lineMenu = signal<{ sid: ID; lid: ID } | null>(null);
 
@@ -22,6 +24,10 @@ export interface LineProps {
   line: Line;
   marks: RhymeMark[];
   marksKey: string;
+  lens: Lens;
+  scheme: string;
+  words: WordMeter[];
+  wordsKey: string;
   headroom: boolean;
   syl: number;
   fit: 'none' | 'exact' | 'near' | 'off';
@@ -30,12 +36,13 @@ export interface LineProps {
   neighbors: { prev?: ID; next?: ID };
 }
 
-interface Piece { s: number; e: number; mark?: RhymeMark; chord?: Chord }
+interface Piece { s: number; e: number; mark?: RhymeMark; chord?: Chord; word?: WordMeter }
 
-/** Split the text at every mark/chord boundary. Chords hang off the first piece of the word they sit on. */
-function pieces(text: string, marks: RhymeMark[], chords: Chord[]): Piece[] {
+/** Split the text at every mark/chord/word boundary. Chords hang off the first piece of the word they sit on. */
+function pieces(text: string, marks: RhymeMark[], chords: Chord[], words: WordMeter[]): Piece[] {
   const cuts = new Set<number>([0, text.length]);
   for (const m of marks) { cuts.add(m.start); cuts.add(m.end); }
+  for (const w of words) { cuts.add(w.tok.start); cuts.add(w.tok.end); }
   const anchors = new Map<number, Chord>();
   for (const c of chords) {
     let i = Math.min(c.at, text.length);
@@ -51,23 +58,27 @@ function pieces(text: string, marks: RhymeMark[], chords: Chord[]): Piece[] {
   for (let k = 0; k < pts.length - 1; k++) {
     const s = pts[k], e = pts[k + 1];
     if (e <= s) continue;
-    out.push({ s, e, mark: marks.find((m) => m.start <= s && m.end >= e), chord: anchors.get(s) });
+    out.push({ s, e, mark: marks.find((m) => m.start <= s && m.end >= e), chord: anchors.get(s), word: words.find((w) => w.tok.start === s) });
   }
   const tail = anchors.get(text.length);
   if (tail && !out.some((p) => p.chord === tail)) out.push({ s: text.length, e: text.length, chord: tail });
   return out;
 }
 
-function Mirror({ text, marks, chords, stamp }: { text: string; marks: RhymeMark[]; chords: Chord[]; stamp: (c: Chord) => any }) {
+const glyph = (c: string) => (c === 'S' ? '/' : c === 's' ? '\\' : '˘');
+
+function Mirror({ text, marks, chords, words, meter, stamp }: { text: string; marks: RhymeMark[]; chords: Chord[]; words: WordMeter[]; meter: boolean; stamp: (c: Chord) => any }) {
   return (
     <>
-      {pieces(text, marks, chords).map((p) => (
-        <span key={p.s} data-s={p.s}
-          class={(p.mark ? `rh ${p.mark.kind} g${p.mark.group % 8} ` : '') + (p.chord ? 'cs' : '')}>
-          {p.chord ? stamp(p.chord) : null}{text.slice(p.s, p.e)}
+      {pieces(text, marks, meter ? [] : chords, meter ? words : []).map((p) => (
+        <span key={p.s} data-s={p.s} data-k={p.word?.key}
+          class={(p.mark ? `rh ${p.mark.kind} g${p.mark.group % 8} ` : '') + (p.chord ? 'cs ' : '') + (p.word ? 'mw' + (p.word.down ? ' down' : '') : '')}>
+          {p.chord ? stamp(p.chord) : null}
+          {p.word ? <i class={'ms' + (p.word.overridden ? ' ov' : '')} aria-hidden="true">{[...p.word.stress].map((c) => <b>{glyph(c)}</b>)}</i> : null}
+          {text.slice(p.s, p.e)}
         </span>
       ))}
-      {'\u200b'}
+      {'​'}
     </>
   );
 }
@@ -77,9 +88,11 @@ export const LineRow = memo(function LineRow(p: LineProps) {
   const inp = useRef<HTMLTextAreaElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const lineEl = useRef<HTMLDivElement>(null);
+  const meter = p.lens === 'meter';
   const setDx = (v: number) => {
     if (lineEl.current) lineEl.current.style.transform = v ? `translate3d(${v}px, 0, 0)` : '';
     wrap.current?.classList.toggle('swiping', v !== 0);
+    wrap.current?.classList.toggle('armed-cut', v < -100);
   };
   const sw = useRef<{ x: number; y: number; on: boolean; dx: number } | null>(null);
 
@@ -139,7 +152,7 @@ export const LineRow = memo(function LineRow(p: LineProps) {
     pasteLines(p.songId, p.sid, line.id, el.selectionStart ?? 0, el.selectionEnd ?? 0, t);
   };
 
-  // ---- swipe left → Boneyard ----
+  // ---- swipe left → into the Shoebox ----
   const down = (e: PointerEvent) => {
     if ((e.target as HTMLElement).closest('.stamp')) return;
     sw.current = { x: e.clientX, y: e.clientY, on: false, dx: 0 };
@@ -156,7 +169,9 @@ export const LineRow = memo(function LineRow(p: LineProps) {
       } else if (Math.abs(ddy) > 14) sw.current = null;
       return;
     }
+    const was = s.dx < -100;
     s.dx = Math.min(0, ddx);
+    if (was !== s.dx < -100) haptic('light');
     setDx(s.dx);
   };
   const up = () => {
@@ -165,19 +180,36 @@ export const LineRow = memo(function LineRow(p: LineProps) {
     if (s?.on) {
       if (s.dx < -100) {
         const gone = p.line.text.trim()
-          ? buryLine(p.songId, p.sid, line.id)
+          ? cutLine(p.songId, p.sid, line.id)
           : { undo: removeLine(p.songId, p.sid, line.id), text: '' };
-        feel('thock', 'medium');
-        if (gone) say(gone.text ? 'FLICKED TO THE BONEYARD' : 'LINE REMOVED', { label: 'UNDO', run: gone.undo });
+        feel('snip', 'medium');
+        if (gone) say(gone.text ? 'CUT → SHOEBOX' : 'LINE REMOVED', { label: 'UNDO', run: gone.undo });
       }
       setDx(0);
     }
   };
 
-  // armed chord: tapping the text stamps it
-  const stampHere = (e: MouseEvent) => {
+  // armed chord: tapping the text stamps it · meter lens: tapping a word cycles its stress / downbeat
+  const tapText = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.stamp')) return;
+    if (meter) {
+      const w = (e.target as HTMLElement).closest('[data-k]') as HTMLElement | null;
+      const wm = w && p.words.find((x) => x.key === w.dataset.k);
+      if (!wm) return;
+      const nx = nextMeter(wm);
+      updateSong(p.songId, (d) => {
+        const sec = d.sections.find((s) => s.id === p.sid);
+        const l = sec && activeTake(sec).lines.find((x) => x.id === line.id);
+        if (!l) return;
+        const m = { ...(l.meter ?? {}) };
+        if (nx) m[wm.key] = nx; else delete m[wm.key];
+        l.meter = Object.keys(m).length ? m : undefined;
+      });
+      feel('click', 'light');
+      return;
+    }
     const armed = armedChord.value;
-    if (!armed || (e.target as HTMLElement).closest('.stamp')) return;
+    if (!armed) return;
     const root = (e.currentTarget as HTMLElement).closest('.line') as HTMLElement;
     placeChord(p.songId, p.sid, line.id, charAt(root, e.clientX, e.clientY, line.text), armed);
     feel('chk', 'light');
@@ -197,24 +229,24 @@ export const LineRow = memo(function LineRow(p: LineProps) {
 
   return (
     <div class="line-wrap" ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-      <div class="line-under"><Icon n="bones" size={18} /><span>BONEYARD</span></div>
-      <div ref={lineEl} class={`line fit-${p.fit}` + (p.headroom ? ' hr' : '')} data-sid={p.sid} data-lid={line.id}>
+      <div class="line-under"><Icon n="box" size={16} /><span>SHOEBOX</span></div>
+      <div ref={lineEl} class={`line fit-${p.fit}` + (p.headroom || meter ? ' hr' : '')} data-sid={p.sid} data-lid={line.id}>
         {p.gutter && (
           <button class={'gut' + (p.mism ? ' mism' : '')} aria-label="Line menu" onClick={() => { lineMenu.value = { sid: p.sid, lid: line.id }; }}>
             {p.syl || ''}{p.mism ? <i>≠</i> : null}
           </button>
         )}
-        <div class="lbox" onClick={stampHere}>
-          <div class="mir" aria-hidden="true"><Mirror text={line.text} marks={p.marks} chords={line.chords} stamp={stamp} /></div>
+        <div class="lbox" onClick={tapText}>
+          <div class="mir" aria-hidden="true"><Mirror text={line.text} marks={p.marks} chords={line.chords} words={p.words} meter={meter} stamp={stamp} /></div>
           <textarea ref={inp} class="lin" rows={1} value={line.text} spellcheck={false} autocapitalize="sentences" autocomplete="off" enterkeyhint="next"
             aria-label="Lyric line" onInput={onInput} onKeyDown={onKeyDown} onBeforeInput={onBeforeInput as any} onPaste={onPaste}
             onFocus={() => { focused.value = { sid: p.sid, lid: line.id }; }} />
         </div>
+        {p.lens === 'rhyme' && <span class="scheme" aria-label={p.scheme ? `Rhyme ${p.scheme}` : undefined}>{p.scheme}</span>}
       </div>
     </div>
   );
 }, (a, b) =>
-  a.line === b.line && a.marksKey === b.marksKey && a.headroom === b.headroom && a.syl === b.syl && a.fit === b.fit &&
+  a.line === b.line && a.marksKey === b.marksKey && a.headroom === b.headroom && a.syl === b.syl && a.fit === b.fit && a.lens === b.lens &&
+  a.scheme === b.scheme && a.wordsKey === b.wordsKey &&
   a.mism === b.mism && a.gutter === b.gutter && a.neighbors.prev === b.neighbors.prev && a.neighbors.next === b.neighbors.next && a.sid === b.sid);
-
-export { currentSong };

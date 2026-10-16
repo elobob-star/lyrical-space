@@ -37,7 +37,7 @@ export async function renderCard(o: CardOpts): Promise<HTMLCanvasElement> {
   try {
     await Promise.all([
       document.fonts.load('56px "Courier Prime"'), document.fonts.load('700 56px "Courier Prime"'),
-      document.fonts.load('40px "Special Elite"'), document.fonts.load('700 22px "Space Mono"'),
+      document.fonts.load('700 22px "Space Grotesk"'),
     ]);
   } catch { /* fall back to system fonts */ }
   const st = STOCKS[o.stock];
@@ -72,10 +72,10 @@ export async function renderCard(o: CardOpts): Promise<HTMLCanvasElement> {
   // frame
   g.strokeStyle = st.soft; g.lineWidth = 3;
   g.strokeRect(44, 44, W - 88, H - 88);
-  g.fillStyle = st.fg; g.font = '700 22px "Space Mono", monospace';
+  g.fillStyle = st.fg; g.font = '700 22px "Space Grotesk", sans-serif';
   g.textBaseline = 'alphabetic';
   (g as any).letterSpacing = '8px';
-  g.fillText('PORTASCRIBE  MK-I', 80, 96);
+  g.fillText('PORTASCRIBE  MK-II', 80, 96);
   g.textAlign = 'right'; g.fillStyle = o.ink; g.fillText('●', W - 80, 96); g.textAlign = 'left';
   (g as any).letterSpacing = '0px';
 
@@ -94,10 +94,10 @@ export async function renderCard(o: CardOpts): Promise<HTMLCanvasElement> {
   for (const l of lines) { g.fillText(l, 124, y); y += lh; }
 
   // title + footer
-  g.font = '44px "Special Elite", "Courier New", monospace';
+  g.font = '700 44px "Courier Prime", "Courier New", monospace';
   g.fillStyle = st.fg;
   g.fillText(o.title.length > 28 ? o.title.slice(0, 27) + '…' : o.title, 80, H - 150);
-  g.font = '700 20px "Space Mono", monospace'; g.fillStyle = st.soft;
+  g.font = '700 20px "Space Grotesk", sans-serif'; g.fillStyle = st.soft;
   (g as any).letterSpacing = '6px';
   g.fillText(o.footer.toUpperCase(), 80, H - 100);
   (g as any).letterSpacing = '0px';

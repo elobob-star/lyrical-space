@@ -1,8 +1,8 @@
 {
   "name": "portascribe",
   "private": true,
-  "version": "0.1.0",
-  "description": "PORTASCRIBE MK-I — a hardware-flavoured lyric notepad",
+  "version": "0.2.0",
+  "description": "PORTASCRIBE MK-II — a hardware-flavoured lyric notepad",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -23,12 +23,9 @@
     "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
-    "@fontsource/barlow-condensed": "^5.3.0",
-    "@fontsource/caveat": "^5.3.0",
     "@fontsource/courier-prime": "^5.3.0",
     "@fontsource/doto": "^5.3.0",
-    "@fontsource/space-mono": "^5.3.0",
-    "@fontsource/special-elite": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
     "@preact/signals": "^2.11.3",
     "immer": "^10.2.0",
     "preact": "^10.29.8"

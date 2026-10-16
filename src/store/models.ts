@@ -7,7 +7,9 @@ export type MarkKind = 'ghost' | 'pencil';
 export interface Mark { id: ID; s: number; e: number; kind: MarkKind; punched?: boolean }
 
 export interface Chord { at: number; name: string }
-export interface Line { id: ID; text: string; chords: Chord[] }
+/** Per-word meter override, keyed `${tokenIndex}:${word}` so it falls away when the word changes. */
+export interface MeterMark { s?: string; d?: 1 }
+export interface Line { id: ID; text: string; chords: Chord[]; meter?: Record<string, MeterMark> }
 export interface Take { id: ID; lines: Line[] }
 
 export type SectionKind = 'verse' | 'pre' | 'chorus' | 'bridge' | 'hook' | 'intro' | 'outro' | 'tag';
@@ -29,7 +31,10 @@ export interface Strip {
   y: number; // 0..1 of board height (top edge)
   rot: number;
   z: number;
-  from: 'roll' | 'spark' | 'bone' | 'typed' | 'splice';
+  /** where the paper came from; 'spark'/'bone' are legacy names for dealt scraps */
+  from: 'roll' | 'deal' | 'typed' | 'splice' | 'cut' | 'spark' | 'bone';
+  /** character offsets where two strips were taped together (the char there is '\n' or ' ') */
+  joints?: number[];
 }
 
 export interface Memo {
@@ -60,13 +65,24 @@ export interface Song {
   memos: Memo[];
 }
 
+/** Where a scrap came from. Everything lives in ONE pile — the Shoebox — this is just a provenance stamp. */
+export type ScrapFrom = 'catch' | 'cut' | 'table' | 'roll';
+
 export interface Scrap {
   id: ID;
   text: string;
-  kind: 'spark' | 'bone';
+  from: ScrapFrom;
   createdAt: number;
   songId?: ID;
   used: number;
+  /** legacy (v0.1): 'spark' | 'bone' */
+  kind?: string;
+}
+
+export function normalizeScrap(s: Scrap): Scrap {
+  if (s.from) return s;
+  const { kind, ...rest } = s;
+  return { ...rest, from: kind === 'bone' ? 'cut' : 'catch' };
 }
 
 export type Paper = 'newsprint' | 'legal' | 'graph' | 'midnight';
@@ -84,7 +100,10 @@ export interface Settings {
   online: boolean;
   awake: boolean;
   leftHand: boolean;
-  tilt: boolean;
+  /** Roll: backspace strikes dry ink through instead of erasing it */
+  ghost: boolean;
+  /** last sprint length in minutes */
+  sprint: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -99,7 +118,8 @@ export const DEFAULT_SETTINGS: Settings = {
   online: true,
   awake: false,
   leftHand: false,
-  tilt: true,
+  ghost: true,
+  sprint: 10,
 };
 
 export const INKS = ['#d9432b', '#c98a14', '#7d8b2e', '#1f8a84', '#3b4fa8', '#8a3f86', '#c9507a', '#5b6670'];

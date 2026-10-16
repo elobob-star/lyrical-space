@@ -46,7 +46,7 @@ function thump(c: AudioContext, t: number, f0: number, f1: number, dur: number, 
   o.start(t); o.stop(t + dur + 0.02);
 }
 
-export type Sound = 'click' | 'thock' | 'clunk' | 'chk' | 'snip' | 'ratchet' | 'ding' | 'key' | 'tick' | 'tock' | 'rec';
+export type Sound = 'click' | 'thock' | 'clunk' | 'chk' | 'snip' | 'ratchet' | 'ding' | 'key' | 'tick' | 'tock' | 'rec' | 'clack' | 'eject' | 'tape' | 'thud' | 'punch' | 'snap' | 'shuffle';
 
 export function sound(kind: Sound): void {
   const st = settings.peek();
@@ -70,6 +70,20 @@ export function sound(kind: Sound): void {
     case 'tick': thump(c, t, 1500, 1500, 0.035, 0.35, 'square'); break;
     case 'tock': thump(c, t, 900, 900, 0.03, 0.22, 'square'); break;
     case 'rec': thump(c, t, 880, 880, 0.08, 0.2); break;
+    // heavy detent of a 70s rotary switch: dry body knock + a short metal contact
+    case 'clack': thump(c, t, 150, 48, 0.09, 0.75); burst(c, t, 0.018, 'bandpass', 1800, 2.5, 0.6); burst(c, t + 0.012, 0.01, 'highpass', 5200, 1, 0.3); break;
+    // spring-loaded cassette door: release click, travel, ka-chunk
+    case 'eject': burst(c, t, 0.012, 'bandpass', 3000, 3, 0.4); burst(c, t + 0.02, 0.09, 'bandpass', 900, 1.2, 0.12); thump(c, t + 0.1, 130, 45, 0.11, 0.65); burst(c, t + 0.1, 0.03, 'lowpass', 1400, 0.8, 0.45); break;
+    // masking tape torn off the roll
+    case 'tape': for (let i = 0; i < 9; i++) burst(c, t + i * 0.013, 0.012, 'bandpass', 1800 + Math.random() * 2600, 1.4, 0.18 + Math.random() * 0.12); break;
+    // a locked key: dull, no travel
+    case 'thud': thump(c, t, 95, 55, 0.06, 0.55); break;
+    // die-cut hole punch: crunch then a light paper flick
+    case 'punch': thump(c, t, 260, 70, 0.07, 0.6, 'triangle'); burst(c, t, 0.03, 'highpass', 2600, 0.8, 0.55); burst(c, t + 0.05, 0.04, 'bandpass', 5000, 0.8, 0.18); break;
+    // metallic toggle snapping over centre
+    case 'snap': burst(c, t, 0.008, 'highpass', 6000, 1, 0.5); thump(c, t, 420, 180, 0.04, 0.35, 'triangle'); burst(c, t + 0.03, 0.01, 'bandpass', 3800, 4, 0.3); break;
+    // papers sliding over each other
+    case 'shuffle': for (let i = 0; i < 5; i++) burst(c, t + i * 0.05, 0.06, 'bandpass', 2400 + i * 300, 0.7, 0.12); break;
   }
 }
 
