@@ -1,0 +1,40 @@
+name: Publish the web app
+
+# The same app as a web page. On an iPhone: open the link in Safari → Share → Add to Home Screen, and it installs
+# like an app and works offline. Needs Settings → Pages → Source: "GitHub Actions" (once).
+on:
+  push:
+    branches: [ccr-a81f4d95-ma4yu1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: |
+          npm ci
+          npm test
+          npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

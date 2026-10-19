@@ -10,7 +10,7 @@ input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user
    CHASSIS — matte putty aluminium, modular plates divided by recessed seams
    ===================================================================== */
 .chassis {
-  position: fixed; inset: 0; display: flex; flex-direction: column; height: var(--vvh, 100%);
+  position: fixed; inset: 0; top: var(--vvt, 0px); display: flex; flex-direction: column; height: var(--vvh, 100%);
   padding-left: var(--safe-left); padding-right: var(--safe-right);
   background: var(--noise), var(--body); color: var(--silk);
 }

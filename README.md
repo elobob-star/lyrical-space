@@ -45,6 +45,12 @@ node scripts/e2e/sheets.mjs out/    # screenshots of every sheet, light and dark
 Regenerate the pronunciation data (only needed if you change `scripts/build-cmu.mjs`): `npm run cmu`.
 Regenerate icons: edit `assets/*.svg`, then `npm run icons && npx capacitor-assets generate --android`.
 
+## iPhone
+
+Foolscap also runs on iPhone — as an installable **web app** (free, no Mac: Safari → Share → Add to Home Screen), as a
+**sideloaded native app**, or through **TestFlight**. The `ios/` project is built on a Mac runner by
+`.github/workflows/ios.yml`. Step by step, costs and caveats: [`docs/IOS.md`](docs/IOS.md).
+
 ## Build the APK
 
 Requirements: JDK 21 and the Android SDK (platform 36, build-tools 36). Set `ANDROID_HOME`.
