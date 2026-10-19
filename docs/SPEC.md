@@ -127,7 +127,15 @@ Keys: **LATCH · PEN · DRAW · PUNCH · SPRINT**
 
 * **Pages** — each page carries a red date stamp and a number. Come back after **45 minutes away or on a new day** and a fresh page is waiting (a blank page is reused, never stacked); `+` tears off a new one by hand. `‹ ›` (or a swipe on the header) flips through earlier pages, which stay writable. Tap the date stamp for the index: every page with its date and first line, searchable.
 
-* **Ghost ink** — finished words can't be erased: backspace strikes them through in graphite. *Typo grace*: the word you're still typing erases normally. Typing over a selection strikes the old words and writes after them. (DIP: GHOST INK.)
+* **Ghost ink** — the rules, in plain words (`src/engine/ink.ts`, unit-tested and fuzzed):
+  * the word you are still typing is *wet*: backspace erases it for real, so typos cost nothing;
+  * a space, punctuation or Enter *finishes* the word. From then on backspace strikes it through in graphite instead of erasing it;
+  * the space or punctuation you just typed is itself erasable, until a full word has been written after it;
+  * whatever you type is always clean ink — also when you tap into the middle of struck-out text (struck runs split around the new text);
+  * moving the caret out of the wet ink dries it; typing over a selection strikes the old words and writes after them. (SETUP: GHOST INK.)
+* **UNDO / REDO** — in the page header the moment there is something to take back (typing in one breath is one step; a strike, a paste, a new line each their own; Ctrl+Z on a keyboard). Struck words come back with it.
+* **THIS PAGE** (tap `P.n`) — COPY TEXT and SHARE (struck-out words left out), TO THE BENCH (the lines become a new verse), BURN THE STRIKES (delete struck ink for good; undoable).
+* **Typewriter scroll** — as you write down the page it follows you, keeping the line you're on in the upper two thirds.
 * **LATCH** — forward only. Backspace is refused with a thud, the caret is pinned to the end, and a paper bail folds away everything above the last lines ("FORWARD ONLY") so you can't reread and judge. Unlatch and the bail lifts.
 * **DRAW** — a random scrap from the Shoebox (least-used first) is taped to the top of the page; ANOTHER / WRITE FROM IT (appends it and puts the caret after it).
 * **PEN** — wax pencil. Tap a phrase (bounded by line breaks and sentence punctuation) to mark it, tap again to clear; press-hold-drag for an exact range.
@@ -136,13 +144,18 @@ Keys: **LATCH · PEN · DRAW · PUNCH · SPRINT**
 
 ### 4.2 TABLE — cut & recombine
 
-Keys: **SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP**
+Keys: **SLIP · DEAL · SNIP · CUT-UP · SHUFFLE · SWEEP**
 
-* Strips are dragged freely (velocity tilt).
-* **Tap** a strip → it's selected: an action row (EDIT · BENCH · keep in SHOEBOX · throw away) and dashed perforations appear in every gap. **Tap a perforation** to snip there.
+* Strips are dragged freely (velocity tilt) and stay on the mat. Shadows are plain boxes, not filters, and tapping a strip writes nothing to the song — that is what keeps it quick on a phone.
+* **Cutting never asks for precision.** Every place a strip can be cut — a gap between words, or the seam between two lines — is a candidate; you aim at the nearest one and a guide (dashed line + scissors) shows where the cut will fall:
+  * **hold** a strip, or switch the scissors on with **SNIP**, then press anywhere on it, slide to re-aim, **let go to cut**. In SNIP mode a plain press cuts at the nearest gap;
+  * **slash** across the mat (start on bare mat) to cut every strip the stroke crosses — vertical strokes cut between words, horizontal ones between lines;
+  * the two pieces start where they were cut and slide apart.
+* **Tap** a strip to pick it up: EDIT · SNIP · BENCH · ⋯ · throw away. **⋯** holds DUPLICATE, SPLIT INTO WORDS, SPLIT INTO LINES and KEEP IN THE SHOEBOX.
 * **Drop a strip on another's bottom edge** → taped underneath (two lines); **on its right edge** → taped end to end. A piece of tape previews while you hover. Joints show the tape; snipping a joint peels it.
 * **Double-tap the mat** → a new slip right there. **SLIP** does the same in a free spot.
-* **DEAL** — four scraps from the Shoebox. **CUT-UP** — slices every strip into 2–4-word fragments (Burroughs/Bowie). **SHUFFLE** — re-scatters (FLIP animation). **SWEEP** — clears the mat; typed and taped work is kept in the Shoebox, copies are just cleared. Every one can be undone from the LCD.
+* **DEAL** — four scraps from the Shoebox. **CUT-UP** — slices every strip into 2–4-word fragments (Burroughs/Bowie). **SHUFFLE** — re-scatters (FLIP animation). **SWEEP** — clears the mat; typed and taped work is kept in the Shoebox, copies are just cleared.
+* **UNDO** — a chip appears on the mat whenever there is something to take back (moves included, counted when there are several); the LCD offers it too.
 * **→ BENCH** slots a strip into a section (or a new verse/chorus/bridge).
 
 ### 4.3 BENCH — the song
@@ -176,7 +189,7 @@ The whole arrangement on one lead sheet in the current paper stock, chords hung 
 ### 4.6 CATCH, SETUP, export
 
 * **CATCH** — a slip peeking from the right edge on every surface. Type, Enter, Enter… DONE. The LCD confirms.
-* **SETUP** (DIP switches) — finish, paper, type size, ghost ink, syllable gutter, online lookups, keep screen on, left-handed, haptics, sounds, typewriter keys, paper grain, backup/restore (memos included).
+* **SETUP** — one tap on the **gear at the end of the LCD**, from anywhere. Calm cards: LOOK (finish, paper and type size as pictures, paper grain), WRITING (ghost ink, syllable gutter, online lookups, keep screen on, left-handed), FEEL (haptics, sounds, typewriter keys), LIBRARY (counts, backup/restore with memos).
 * **Export** — lyrics, chords-over, ChordPro, Markdown; copy / file / share; generative **Lyric Card** PNG.
 
 ---
@@ -186,7 +199,8 @@ The whole arrangement on one lead sheet in the current paper stock, chords hung 
 * **Pronunciation** — bundled CMU dictionary (~126 k words), 1 char/phone, binary-searched. Syllables = vowel phones; OOV fallback by vowel groups.
 * **Stress** — per syllable (`S` primary, `s` secondary, `u` none); one-syllable function words `u`, content words `S`. Per-word overrides keyed `${index}:${word}` so they fall away when the word changes.
 * **Rhyme** — key from the last stressed vowel; slant key = stressed vowel. Flow analysis groups perfect rhymes (≥ 2 distinct words) then slant end-rhymes; scheme letters come from the end-word groups.
-* **Ghost ink** — `marks {s,e,kind:'ghost'|'pencil',punched?}` re-based on every edit (diff of common prefix/suffix). Handlers read live store state, never the render closure (several input events can arrive between renders).
+* **Ghost ink** — `marks {s,e,kind:'ghost'|'pencil',punched?}` re-based on every edit (diff of common prefix/suffix); a ghost mark is *split* around an edit inside it, a pencil mark stretches. The decision "erase or strike?" is a pure reducer (`reduce` / `reduceDiff`): `beforeinput` feeds it where the event is cancelable, and the post-hoc diff feeds it when an IME already changed the text. Handlers read live store state, never the render closure (several input events can arrive between renders).
+* **Undo** — the notebook keeps snapshots per page (text + struck ink, bursts coalesced); Table and Bench keep a LIFO stack per song and surface (`store/undo.ts`) whose entries are inverse operations (snapshots of the strips, of a take's lines, of the arrangement, of key/capo/tuning/tempo).
 * **Importer** — two passes: rows → blocks (headers, directives, chord lines → column-anchored chords, inline `[C]`), then blocks → sections + arrangement.
 * **Cut-up** — 2–4-word fragments, never leaving a single word at the end.
 
@@ -229,11 +243,11 @@ The three surfaces are panes on one "desk"; the outgoing pane stays mounted for 
 ## 9. Verification
 
 * `npm test` — engine unit tests (dictionary, syllables, stress, rhyme, scheme, diff/rebase, cadence, music, transpose, importer, meter overrides, migration, export).
-* `scripts/e2e/flows.mjs` — ~70 interactions at phone size: typo grace, ghost ink, latch & bail, draw, pen tap/drag, punch → table, deal, drag, snip, tape, cut-up + LCD undo, shuffle, sweep + undo, double-tap slip, slot to bench, split/merge, chord drag, swipe → shoebox, shoebox drawer, words swap, tabs, both lenses + meter override, transpose, stand auto-scroll, catch, rack shoebox, history, paste-in import, finish switch.
-* `scripts/e2e/persist.mjs` (production bundle), `upgrade.mjs` (an MK-I/MK-II database opened by this build: rolls → pages, bones → shoebox, migration runs once), `perf.mjs` (4× CPU throttle), `tour.mjs` / `sheets.mjs` (screenshots).
+* `scripts/e2e/flows.mjs` — ~90 interactions at phone size: typo grace, ghost ink, typing inside struck ink, notebook undo/redo, latch & bail, draw, pen tap/drag, punch → table, deal, drag, hold-to-cut, SNIP, slash, split into words, UNDO chip, tape, cut-up + LCD undo, shuffle, sweep + undo, double-tap slip, slot to bench, split/merge, chord drag, swipe → shoebox, shoebox drawer, words swap, tabs, both lenses + meter override, transpose, stand auto-scroll, catch, rack shoebox, history, paste-in import, finish switch.
+* `scripts/e2e/undo.mjs` (notebook strikes, burn, page menu; bench typing / Enter / move / tempo undo; the LCD gear), `persist.mjs` (production bundle), `upgrade.mjs` (an MK-I/MK-II database opened by this build: rolls → pages, bones → shoebox, migration runs once), `perf.mjs` (4× CPU throttle), `tour.mjs` / `sheets.mjs` (screenshots).
 
 ## 10. Roadmap
 
 Android *share-into-Portascribe* intent (catch from any app), home-screen CATCH widget, cloud sync, collaborative
 writing, per-line alternates, Play Store signing. Physical-device pass still to do: Gboard composition with ghost ink
-and the latch, mic permission on first hold-to-hum.
+and the latch (the ink reducer is covered with an emulated IME in Chromium, but not on a real keyboard), mic permission on first hold-to-hum.

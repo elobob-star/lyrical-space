@@ -6,6 +6,7 @@ import {
 import { INKS, INK_NAMES, ID, Line, Song, activeTake, lineCount, newSection, provenance, uid } from '../store/models';
 import { layer, rackTab, say } from '../store/ui';
 import { feel } from '../engine/feel';
+import { clearUndo, pushUndo } from '../store/undo';
 import { makeStrips } from '../store/actions';
 import { listSnapshots, Snapshot } from '../store/history';
 import { parseLyrics } from '../engine/importText';
@@ -76,7 +77,7 @@ function HistorySheet({ id, onClose }: { id: ID; onClose: () => void }) {
         <div class="row wrap" style={{ marginTop: '12px' }}>
           <button class="btn" onClick={async () => { await restoreVersion(s, true); feel('chk', 'medium'); say('OLD VERSION LOADED AS A COPY'); onClose(); }}>AS A COPY</button>
           <span class="grow" />
-          <button class="btn go" onClick={async () => { await restoreVersion(s, false); feel('chk', 'medium'); say('ROLLED BACK — THE NEWER VERSION IS IN HISTORY TOO'); onClose(); }}>ROLL BACK TO THIS</button>
+          <button class="btn go" onClick={async () => { await restoreVersion(s, false); clearUndo(s.id); feel('chk', 'medium'); say('ROLLED BACK — THE NEWER VERSION IS IN HISTORY TOO'); onClose(); }}>ROLL BACK TO THIS</button>
         </div>
       </Sheet>
     );
@@ -161,7 +162,9 @@ function Shoebox({ q }: { q: string }) {
               setMode('roll'); feel('thock', 'medium');
             }}><Icon n="draw" size={15} /></button>
             <button aria-label="Lay it on the Table" onClick={() => {
-              updateCurrent((d) => { d.table.push(...makeStrips([s.text], 'deal', d.table)); });
+              const ids = new Set<string>();
+              updateCurrent((d) => { const fresh = makeStrips([s.text], 'deal', d.table); fresh.forEach((f) => ids.add(f.id)); d.table.push(...fresh); });
+              pushUndo('table', 'ON THE TABLE', () => updateCurrent((d) => { d.table = d.table.filter((x) => !ids.has(x.id)); }));
               updateScrap(s.id, { used: s.used + 1 });
               say('ON THE TABLE', { label: 'GO', run: () => setMode('table') });
               feel('chk', 'light');
@@ -240,7 +243,6 @@ export function Rack() {
             {q && <button onClick={() => setQ('')} aria-label="Clear search"><Icon n="close" size={13} /></button>}
           </>
         ) : <span class="grow tiny">BINNED TAPES WAIT HERE FOR 30 DAYS</span>}
-        <button class="gear" aria-label="Setup" onClick={() => { feel('click'); layer.value = 'settings'; }}><Icon n="gear" size={16} stroke={1.5} /></button>
       </div>
       <div class="rack-body">
         {tab === 'tapes' && (
@@ -257,7 +259,7 @@ export function Rack() {
               <div class="jcard binned" key={s.id} style={{ '--c': `var(--ink-${s.ink})` }}>
                 <div class="jc-main"><span class="jc-stripe" /><span class="jc-label"><span class="jc-title">{s.title}</span><span class="jc-meta">BINNED {ago(s.deletedAt!)}</span></span></div>
                 <button class="btn small" onClick={() => { restoreSong(s.id); feel('chk'); }}>RESTORE</button>
-                <button class="btn small danger" onClick={() => { void purgeSong(s.id); feel('thock'); }}>ERASE</button>
+                <button class="btn small danger" onClick={() => { clearUndo(s.id); void purgeSong(s.id); feel('thock'); }}>ERASE</button>
               </div>
             ))}
           </>

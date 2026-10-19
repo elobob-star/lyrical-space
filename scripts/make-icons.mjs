@@ -8,6 +8,7 @@ const jobs = [
   ['assets/icon-background.svg', 'assets/icon-background.png', 1024, false],
   ['assets/icon.svg', 'public/icon-512.png', 512, false],
   ['assets/icon.svg', 'public/icon-192.png', 192, false],
+  ['assets/icon.svg', 'public/apple-touch-icon.png', 180, false],
 ];
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium' });
 const page = await browser.newPage();

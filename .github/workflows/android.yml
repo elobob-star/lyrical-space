@@ -21,7 +21,11 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      # the runner image already ships an Android SDK; the action's default `tools` package no longer exists
+      # in current cmdline-tools and made every run fail here. Gradle fetches platform/build-tools itself.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install, test, build web
         run: |

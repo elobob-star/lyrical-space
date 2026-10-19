@@ -1,5 +1,5 @@
 import { memo } from 'preact/compat';
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { signal } from '@preact/signals';
 import { Chord, ID, Line } from '../../store/models';
 import { RhymeMark } from '../../engine/rhyme';
@@ -12,6 +12,7 @@ import { currentSong, updateSong } from '../../store/state';
 import { cutLine } from '../../store/actions';
 import { feel, haptic } from '../../engine/feel';
 import { Lens, say } from '../../store/ui';
+import { runUndo, undoable } from '../../store/undo';
 import { activeTake } from '../../store/models';
 import { Icon } from '../icons';
 import { armedChord, charAt, startChordDrag } from './chordDrag';
@@ -95,6 +96,25 @@ export const LineRow = memo(function LineRow(p: LineProps) {
     wrap.current?.classList.toggle('armed-cut', v < -100);
   };
   const sw = useRef<{ x: number; y: number; on: boolean; dx: number } | null>(null);
+
+  // headroom for chord stamps goes above the first row only — unless a chord lands on a wrapped row, then every row gets it
+  const [wrapc, setWrapc] = useState(false);
+  useLayoutEffect(() => {
+    const mir = lineEl.current?.querySelector<HTMLElement>('.mir');
+    if (!mir) return;
+    const check = () => {
+      const first = mir.firstElementChild as HTMLElement | null;
+      if (!first || !p.headroom || meter) { setWrapc(false); return; }
+      const t0 = first.getBoundingClientRect().top;
+      let wrapped = false;
+      mir.querySelectorAll<HTMLElement>('.cs').forEach((m) => { if (m.getBoundingClientRect().top - t0 > 8) wrapped = true; });
+      setWrapc(wrapped);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(mir);
+    return () => ro.disconnect();
+  }, [line.text, line.chords, p.headroom, meter, p.marksKey, p.wordsKey]);
 
   // external focus requests (after split / merge / insert)
   useEffect(() => focusReq.subscribe((r) => {
@@ -189,7 +209,7 @@ export const LineRow = memo(function LineRow(p: LineProps) {
           ? cutLine(p.songId, p.sid, line.id)
           : { undo: removeLine(p.songId, p.sid, line.id), text: '' };
         feel('snip', 'medium');
-        if (gone) say(gone.text ? 'CUT → SHOEBOX' : 'LINE REMOVED', { label: 'UNDO', run: gone.undo });
+        if (gone) undoable('bench', gone.text ? 'CUT → SHOEBOX' : 'LINE REMOVED', gone.undo);
       }
       setDx(0);
     }
@@ -228,7 +248,7 @@ export const LineRow = memo(function LineRow(p: LineProps) {
         startChordDrag(e as any, c.name, { songId: p.songId, sid: p.sid, lid: line.id, at: c.at, name: c.name }, () => {
           const gone = removeChord(p.songId, p.sid, line.id, c.at);
           feel('thock', 'light');
-          if (gone) say(`PEELED OFF ${gone.name}`, { label: 'UNDO', run: () => placeChord(p.songId, p.sid, line.id, gone.at, gone.name) });
+          if (gone) say(`PEELED OFF ${gone.name}`, { label: 'UNDO', run: () => { runUndo('bench'); } });
         });
       }}>{c.name}</button>
   );
@@ -236,7 +256,7 @@ export const LineRow = memo(function LineRow(p: LineProps) {
   return (
     <div class="line-wrap" ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
       <div class="line-under"><Icon n="box" size={16} /><span>SHOEBOX</span></div>
-      <div ref={lineEl} class={`line fit-${p.fit}` + (p.headroom || meter ? ' hr' : '')} data-sid={p.sid} data-lid={line.id}>
+      <div ref={lineEl} class={`line fit-${p.fit}` + (p.headroom || meter ? ' hr' : '') + (meter || wrapc ? ' uni' : '')} data-sid={p.sid} data-lid={line.id}>
         {p.gutter && (
           <button class={'gut' + (p.mism ? ' mism' : '')} aria-label="Line menu" onClick={() => { lineMenu.value = { sid: p.sid, lid: line.id }; }}>
             {p.syl || ''}{p.mism ? <i>≠</i> : null}

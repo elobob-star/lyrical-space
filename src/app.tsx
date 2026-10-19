@@ -61,10 +61,13 @@ export function App() {
       const h = vv?.height ?? window.innerHeight;
       maxH = Math.max(maxH, window.innerHeight, h);
       document.documentElement.style.setProperty('--vvh', h + 'px');
+      // iOS slides the visual viewport instead of resizing the page when the keyboard opens: ride along with it
+      document.documentElement.style.setProperty('--vvt', (vv?.offsetTop ?? 0) + 'px');
       keyboardOpen.value = maxH - h > 120;
     };
     sync();
     vv?.addEventListener('resize', sync);
+    vv?.addEventListener('scroll', sync);
     window.addEventListener('resize', sync);
 
     // hardware back button / swipe-back
@@ -80,7 +83,12 @@ export function App() {
       });
       off = () => void h.remove();
     });
-    return () => { off?.(); vv?.removeEventListener('resize', sync); window.removeEventListener('resize', sync); };
+    // iPhone: no "previous / next / done" bar above the keyboard — it only gets in the way of writing
+    void import('@capacitor/core').then(async ({ Capacitor }) => {
+      if (Capacitor.getPlatform() !== 'ios') return;
+      try { const { Keyboard } = await import('@capacitor/keyboard'); await Keyboard.setAccessoryBarVisible({ isVisible: false }); } catch { /* optional */ }
+    });
+    return () => { off?.(); vv?.removeEventListener('resize', sync); vv?.removeEventListener('scroll', sync); window.removeEventListener('resize', sync); };
   }, []);
 
   // sheets dim everything below the top bezel, so the LCD stays readable while they're open
@@ -108,16 +116,31 @@ export function App() {
     document.body.style.background = c;
   }, [finish]);
 
-  // wake lock (always on while the music stand is up)
+  // keep the screen on (always while the music stand is up): the native plugin on a phone, the Wake Lock API in a browser
   const awake = settings.value.awake || layer.value === 'stand';
   useEffect(() => {
     if (!awake) return;
-    let lock: any;
-    const req = async () => { try { lock = await (navigator as any).wakeLock?.request('screen'); } catch { /* denied */ } };
-    void req();
-    const vis = () => { if (document.visibilityState === 'visible') void req(); };
+    let cancelled = false;
+    let release: (() => void) | undefined;
+    const vis = () => { if (document.visibilityState === 'visible') void start(); };
+    const start = async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const { KeepAwake } = await import('@capacitor-community/keep-awake');
+          await KeepAwake.keepAwake();
+          release = () => void KeepAwake.allowSleep();
+        } catch { /* optional */ }
+        return;
+      }
+      try {
+        const lock = await (navigator as any).wakeLock?.request('screen');
+        release = () => void lock?.release?.();
+      } catch { /* denied */ }
+    };
+    void start().then(() => { if (cancelled) release?.(); });
     document.addEventListener('visibilitychange', vis);
-    return () => { document.removeEventListener('visibilitychange', vis); void lock?.release?.(); };
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', vis); release?.(); };
   }, [awake]);
 
   // opening the rack puts the keyboard away

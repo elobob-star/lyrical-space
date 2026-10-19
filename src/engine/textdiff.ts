@@ -1,4 +1,5 @@
 import type { Chord, Mark } from '../store/models';
+import { uid } from '../store/models';
 
 export interface Edit { start: number; del: number; ins: number }
 
@@ -15,6 +16,8 @@ export function diffEdit(a: string, b: string, caret?: number): Edit {
     const c = caret - ins;
     if (c >= 0 && c <= a.length && a.slice(0, c) + b.slice(c, caret) + a.slice(c) === b) start = c;
   }
+  // A deletion beside an equal character is ambiguous ("bcc" → "bc"): the caret says which one went.
+  if (caret !== undefined && ins === 0 && del > 0 && caret >= 0 && caret + del <= a.length && a.slice(0, caret) + a.slice(caret + del) === b) start = caret;
   return { start, del, ins };
 }
 
@@ -27,7 +30,12 @@ export function rebaseMarks(marks: Mark[], ed: Edit): Mark[] {
     let s = m.s, e = m.e;
     if (e <= ed.start) { /* before the edit */ }
     else if (s >= delEnd) { s += shift; e += shift; }
-    else {
+    else if (m.kind === 'ghost') {
+      // struck-out text never swallows what is typed into it: keep the struck halves, leave the new text clean
+      if (s < ed.start) out.push({ ...m, s, e: ed.start });
+      if (e > delEnd) out.push({ ...m, id: s < ed.start ? uid() : m.id, s: ed.start + ed.ins, e: e + shift });
+      continue;
+    } else {
       // overlap: drop the removed part; an insertion strictly inside the mark stretches it
       const ne = e > delEnd ? e + shift : ed.start;
       s = Math.min(s, ed.start);

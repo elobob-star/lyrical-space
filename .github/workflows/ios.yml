@@ -1,0 +1,74 @@
+name: Build iOS
+
+# Builds the iPhone app on a Mac runner. No Apple account needed for this:
+#  · Foolscap-simulator.zip  — runs in the Xcode iOS Simulator (drag onto it, or `xcrun simctl install booted App.app`)
+#  · Foolscap-unsigned.ipa   — a device build with no signature, to be re-signed with your own Apple ID and sideloaded
+#    (AltStore, Sideloadly, …). See docs/IOS.md.
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install, test, build web
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      - name: Versions
+        id: v
+        run: |
+          echo "marketing=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          xcodebuild -version
+
+      - name: Resolve Swift packages
+        working-directory: ios/App
+        run: xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
+
+      - name: Build for the iOS Simulator
+        working-directory: ios/App
+        run: |
+          xcodebuild build \
+            -project App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/sim \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION=${{ steps.v.outputs.marketing }} CURRENT_PROJECT_VERSION=${{ steps.v.outputs.build }}
+          cd build/sim/Build/Products/Debug-iphonesimulator
+          zip -qr "$GITHUB_WORKSPACE/Foolscap-simulator.zip" App.app
+
+      - name: Build an unsigned device IPA
+        working-directory: ios/App
+        run: |
+          xcodebuild archive \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION=${{ steps.v.outputs.marketing }} CURRENT_PROJECT_VERSION=${{ steps.v.outputs.build }}
+          rm -rf Payload && mkdir Payload
+          cp -R build/App.xcarchive/Products/Applications/App.app Payload/
+          zip -qr "$GITHUB_WORKSPACE/Foolscap-unsigned.ipa" Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: foolscap-ios
+          path: |
+            Foolscap-simulator.zip
+            Foolscap-unsigned.ipa

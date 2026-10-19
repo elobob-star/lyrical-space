@@ -1,0 +1,9 @@
+# Free hosting that works with a private repository (Netlify's free plan): connect the repo once and every push to the
+# main branch publishes the web app. Cloudflare Pages and Vercel read the same two settings:
+#   build command  npm run build        output folder  dist
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"

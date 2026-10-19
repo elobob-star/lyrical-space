@@ -4,7 +4,7 @@ import { Icon } from './icons';
 import { Key } from './Key';
 import { currentSong, liveSongs, mode, scraps, settings, songs, Mode } from '../store/state';
 import { currentPage, pages } from '../store/notebook';
-import { dismissMsg, layer, latch, lcdMsg, lens, pen, rackTab, sprint } from '../store/ui';
+import { cutting, dismissMsg, layer, latch, lcdMsg, lens, pen, rackTab, sprint } from '../store/ui';
 import { recLevel, recording } from '../engine/recorder';
 import { feel } from '../engine/feel';
 import { sectionAbbrev, sectionNames } from '../store/models';
@@ -73,6 +73,8 @@ function Readout() {
     );
   } else if (msg) {
     body = <><Message text={msg.text} id={msg.id} />{msg.action && <span class="act">{msg.action.label}</span>}</>;
+  } else if (ly === 'settings') {
+    body = <><span>SETUP</span><span class="sp" /><span class="dim">FOOLSCAP</span></>;
   } else if (ly === 'rack') {
     const tab = rackTab.value;
     const n = tab === 'tapes' ? liveSongs.value.length : tab === 'shoebox' ? scraps.value.length : songs.value.filter((s) => s.deletedAt).length;
@@ -95,7 +97,7 @@ function Readout() {
     body = <span class="dim">NO TAPE</span>;
   } else if (m === 'table') {
     const n = song.table.length;
-    body = <><span class="msgwin">{song.title}</span><span class="hot">{String(n).padStart(2, '0')}</span></>;
+    body = <><span class="msgwin">{song.title}</span>{cutting.value && <span class="hot">SNIP</span>}<span class="hot">{String(n).padStart(2, '0')}</span></>;
   } else {
     const names = sectionNames(song);
     const map = song.arrangement.map((a) => { const s = song.sections.find((x) => x.id === a.sectionId); return s ? sectionAbbrev(s, names) : ''; }).join(' ');
@@ -134,7 +136,12 @@ export function Bezel() {
     <div class="bezel-top">
       <div class="bezel-row" style={{ flexDirection: lh ? 'row-reverse' : 'row' }}>
         <div class="eject"><Key icon="eject" label="Tapes" led on={rackOpen} sound={null} onClick={toggleRack} /></div>
-        <div class="mid"><Readout /></div>
+        <div class="mid">
+          <div class="lcd-wrap">
+            <Readout />
+            <button class={'lcd-gear' + (layer.value === 'settings' ? ' on' : '')} aria-label="Setup" onClick={() => { feel('click', 'light'); layer.value = layer.peek() === 'settings' ? null : 'settings'; }}><Icon n="gear" size={16} stroke={1.7} /></button>
+          </div>
+        </div>
         {dial}
       </div>
     </div>

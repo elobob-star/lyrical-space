@@ -7,8 +7,10 @@ import { feel, metronomeOn, startMetronome, stopMetronome } from '../../engine/f
 import { cancelRecording, recLevel, recording, startRecording, stopRecording } from '../../engine/recorder';
 import { loopIds, playProgress, playingId, stopMemo, toggleLoop, togglePlay } from '../../engine/memoPlayer';
 import { say } from '../../store/ui';
+import { pushUndo } from '../../store/undo';
 import { Icon } from '../icons';
 import { Sheet, TextSheet } from '../Sheet';
+import { SwitchRow } from '../Switch';
 
 export const deckSheet = signal<null | 'key' | 'capo' | 'tuning' | 'bpm'>(null);
 export const metro = signal(false);
@@ -192,6 +194,7 @@ function KeySheet() {
     const next = parseKey(r + (minor ? 'm' : ''))!;
     const semis = key && hasChords && move ? semisBetween(key, next) : 0;
     const flat = isFlatKey(next);
+    deckUndo('KEY', !!semis);
     updateCurrent((d) => {
       d.key = keyName(next);
       if (!semis) return;
@@ -202,13 +205,10 @@ function KeySheet() {
     close();
   };
   return (
-    <Sheet title="KEY" onClose={close} right={<button class="btn small" onClick={() => { updateCurrent((d) => { d.key = null; }); close(); }}>CLEAR</button>}>
+    <Sheet title="KEY" onClose={close} right={<button class="btn small" onClick={() => { deckUndo('KEY'); updateCurrent((d) => { d.key = null; }); close(); }}>CLEAR</button>}>
       <div class="seg"><button class={!minor ? 'on' : ''} onClick={() => setMinor(false)}>MAJOR</button><button class={minor ? 'on' : ''} onClick={() => setMinor(true)}>MINOR</button></div>
       {key && hasChords && (
-        <button class="dip-row" role="switch" aria-checked={move} onClick={() => { feel('click'); setMove(!move); }}>
-          <span class={'dip' + (move ? ' on' : '')}><i /></span>
-          <span class="dl"><b>MOVE THE CHORDS TOO</b><small>transpose every stamp into the new key</small></span>
-        </button>
+        <SwitchRow label="MOVE THE CHORDS TOO" hint="transpose every stamp into the new key" on={move} onChange={setMove} />
       )}
       <div class="grid4" style={{ marginTop: '10px' }}>
         {ROOTS.map((r) => (
@@ -226,7 +226,7 @@ function CapoSheet() {
     <Sheet title="CAPO" onClose={close}>
       <div class="grid4">
         {Array.from({ length: 10 }, (_, i) => i).map((n) => (
-          <button class={'cell' + (song.capo === n ? ' on' : '')} key={n} onClick={() => { feel('click'); updateCurrent((d) => { d.capo = n; }); close(); }}>{n === 0 ? 'NONE' : n}</button>
+          <button class={'cell' + (song.capo === n ? ' on' : '')} key={n} onClick={() => { feel('click'); deckUndo('CAPO'); updateCurrent((d) => { d.capo = n; }); close(); }}>{n === 0 ? 'NONE' : n}</button>
         ))}
       </div>
     </Sheet>
@@ -241,15 +241,26 @@ function TuningSheet() {
     <Sheet title="TUNING" onClose={close}>
       <div class="list">
         {TUNINGS.map((t) => (
-          <button class={'li' + (song.tuning === t ? ' on' : '')} key={t} onClick={() => { feel('click'); updateCurrent((d) => { d.tuning = t; }); close(); }}>{t}</button>
+          <button class={'li' + (song.tuning === t ? ' on' : '')} key={t} onClick={() => { feel('click'); deckUndo('TUNING'); updateCurrent((d) => { d.tuning = t; }); close(); }}>{t}</button>
         ))}
       </div>
       <div class="row" style={{ marginTop: '10px' }}>
         <input class="field" placeholder="custom tuning…" value={custom} onInput={(e) => setCustom((e.target as HTMLInputElement).value)} />
-        <button class="btn go" onClick={() => { if (custom.trim()) { updateCurrent((d) => { d.tuning = custom.trim(); }); close(); } }}>SET</button>
+        <button class="btn go" onClick={() => { if (custom.trim()) { deckUndo('TUNING'); updateCurrent((d) => { d.tuning = custom.trim(); }); close(); } }}>SET</button>
       </div>
     </Sheet>
   );
+}
+
+/** Remember the song's key / capo / tuning / tempo (and its chords, when a key change moves them) so the change can be undone. */
+function deckUndo(label: string, withSections = false): void {
+  const song = currentSong.peek();
+  if (!song) return;
+  const snap = JSON.parse(JSON.stringify({ key: song.key, capo: song.capo, tuning: song.tuning, bpm: song.bpm, sections: song.sections }));
+  pushUndo('bench', label, () => updateCurrent((d) => {
+    d.key = snap.key; d.capo = snap.capo; d.tuning = snap.tuning; d.bpm = snap.bpm;
+    if (withSections) d.sections = snap.sections;
+  }));
 }
 
 const taps: number[] = [];
@@ -257,7 +268,11 @@ const taps: number[] = [];
 function BpmSheet() {
   const song = currentSong.value!;
   const close = () => (deckSheet.value = null);
-  const set = (n: number) => updateCurrent((d) => { d.bpm = Math.max(40, Math.min(240, Math.round(n))); });
+  const recorded = useRef(false);
+  const set = (n: number) => {
+    if (!recorded.current) { recorded.current = true; deckUndo('TEMPO'); }
+    updateCurrent((d) => { d.bpm = Math.max(40, Math.min(240, Math.round(n))); });
+  };
   const tap = () => {
     const now = performance.now();
     if (taps.length && now - taps[taps.length - 1] > 2200) taps.length = 0;

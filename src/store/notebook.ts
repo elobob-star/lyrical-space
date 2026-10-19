@@ -40,7 +40,7 @@ export function pagesFromSongs(songs: Song[]): Page[] {
 
 const WELCOME =
   'This is the notebook. It belongs to no song, so just ramble.\n\n' +
-  'Backspace never erases a finished word here: it strikes it through, and nothing is lost. ' +
+  'The word you are typing erases like normal. Once you hit space it is finished, and backspace strikes it through instead — nothing is lost. ' +
   'Come back after a break and there is a fresh page waiting; the old ones are a flip back.\n\n' +
   'Flip the LATCH to go forward only. Later, pick up the PEN, tap the lines worth keeping and PUNCH them into the shoebox.\n';
 
