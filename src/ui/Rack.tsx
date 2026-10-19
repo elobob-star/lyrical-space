@@ -240,7 +240,6 @@ export function Rack() {
             {q && <button onClick={() => setQ('')} aria-label="Clear search"><Icon n="close" size={13} /></button>}
           </>
         ) : <span class="grow tiny">BINNED TAPES WAIT HERE FOR 30 DAYS</span>}
-        <button class="gear" aria-label="Setup" onClick={() => { feel('click'); layer.value = 'settings'; }}><Icon n="gear" size={16} stroke={1.5} /></button>
       </div>
       <div class="rack-body">
         {tab === 'tapes' && (

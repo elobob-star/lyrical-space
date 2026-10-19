@@ -158,13 +158,16 @@ interface Slash { x0: number; y0: number; x1: number; y1: number; on: boolean }
 interface Ctl { down: (e: PointerEvent, s: Strip) => void; move: (e: PointerEvent) => void; up: (e: PointerEvent, s: Strip) => void; cancel: () => void }
 
 const HOLD_MS = 330;
+/** a long press must not open the system's context menu — it would cancel the touch the scissors are riding on */
+const noMenu = (e: Event) => e.preventDefault();
 
 const StripView = memo(function StripView({ s, sel, delay, ctl }: { s: Strip; sel: boolean; delay?: number; ctl: Ctl }) {
   return (
     <div data-id={s.id} data-rot={s.rot}
       class={'strip f-' + s.from + (sel ? ' sel' : '') + (delay !== undefined ? ' landing' : '')}
       style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%`, zIndex: s.z, transform: `rotate(${s.rot}deg)`, '--r': s.rot, '--x': s.x, animationDelay: delay !== undefined ? `${delay}ms` : undefined } as any}
-      onPointerDown={(e) => ctl.down(e as any, s)} onPointerMove={ctl.move as any} onPointerUp={(e) => ctl.up(e as any, s)} onPointerCancel={ctl.cancel}>
+      onPointerDown={(e) => ctl.down(e as any, s)} onPointerMove={ctl.move as any} onPointerUp={(e) => ctl.up(e as any, s)} onPointerCancel={ctl.cancel}
+      onContextMenu={noMenu}>
       <i class="shade" aria-hidden="true" />
       <div class="paper" style={{ clipPath: edges(s.id) }}><StripBody s={s} /></div>
     </div>
@@ -462,7 +465,7 @@ export function TableView() {
 
   return (
     <div class={'mode-view table' + (cut ? ' cutting' : '')}>
-      <div class={'board' + (cut ? ' cutting' : '')} ref={board} onPointerDown={matDown as any} onPointerMove={matMove as any} onPointerUp={matUp as any} onPointerCancel={() => { sl.current = null; if (slashEl.current) slashEl.current.hidden = true; }}>
+      <div class={'board' + (cut ? ' cutting' : '')} ref={board} onContextMenu={noMenu} onPointerDown={matDown as any} onPointerMove={matMove as any} onPointerUp={matUp as any} onPointerCancel={() => { sl.current = null; if (slashEl.current) slashEl.current.hidden = true; }}>
         <div class="mat-rule" aria-hidden="true" />
         <div class="mat-label" aria-hidden="true">{song.title}</div>
         <UndoChip surface="table" />
