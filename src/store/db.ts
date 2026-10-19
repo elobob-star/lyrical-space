@@ -1,17 +1,17 @@
 // Tiny promise wrapper around IndexedDB with an in-memory fallback.
 const DB_NAME = 'portascribe';
-const STORES = ['songs', 'scraps', 'blobs', 'kv', 'history'] as const;
+const STORES = ['songs', 'scraps', 'blobs', 'kv', 'history', 'pages'] as const;
 type StoreName = (typeof STORES)[number];
 
 let dbp: Promise<IDBDatabase | null> | null = null;
 const mem: Record<StoreName, Map<string, unknown>> = {
-  songs: new Map(), scraps: new Map(), blobs: new Map(), kv: new Map(), history: new Map(),
+  songs: new Map(), scraps: new Map(), blobs: new Map(), kv: new Map(), history: new Map(), pages: new Map(),
 };
 
 function open(): Promise<IDBDatabase | null> {
   dbp ??= new Promise((resolve) => {
     try {
-      const req = indexedDB.open(DB_NAME, 2);
+      const req = indexedDB.open(DB_NAME, 3);
       req.onupgradeneeded = () => {
         for (const s of STORES) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s);
       };

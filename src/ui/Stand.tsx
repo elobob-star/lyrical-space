@@ -44,7 +44,7 @@ function Sung({ line, chords }: { line: Line; chords: boolean }) {
   return (
     <div class="sl ch">
       {parts.map((p) => (
-        <span class="sg" key={p.s}>{at.get(p.s) && <b class="cn">{at.get(p.s)!.name}</b>}{text.slice(p.s, p.e) || (at.get(p.s) ? '  ' : '')}</span>
+        <span class={at.get(p.s) ? 'sg anc' : 'sg'} key={p.s}>{at.get(p.s) && <b class="cn">{at.get(p.s)!.name}</b>}{text.slice(p.s, p.e) || (at.get(p.s) ? '\u00a0\u00a0' : '')}</span>
       ))}
     </div>
   );
@@ -106,10 +106,17 @@ export function Stand() {
     <div class="stand" style={{ '--stand-ts': SIZES[prefs.size] + 'px' }} role="dialog" aria-label="Music stand">
       <div class="stand-progress"><i ref={bar} /></div>
       <div class={'stand-head' + (chrome ? '' : ' hide')}>
-        <div class="st-title"><b>{song.title}</b><small>{meta}</small></div>
-        <button class={'tog' + (prefs.chords ? ' on' : '')} onClick={() => set({ chords: !prefs.chords })}>CHORDS</button>
-        <button class={'tog' + (prefs.compact ? ' on' : '')} aria-label="Fold repeats" onClick={() => set({ compact: !prefs.compact })}>FOLD ↻</button>
-        <button class="btn small" aria-label="Close the stand" onClick={close}><Icon n="close" size={13} stroke={2} /></button>
+        <div class="st-top">
+          <b class="st-name">{song.title}</b>
+          <button class="btn small" aria-label="Export or share" onClick={() => { layer.value = 'export'; }}><Icon n="send" size={13} /></button>
+          <button class="btn small" aria-label="Close the stand" onClick={close}><Icon n="close" size={13} stroke={2} /></button>
+        </div>
+        <div class="st-sub">
+          <small>{meta}</small>
+          <span class="grow" />
+          <button class={'tog' + (prefs.chords ? ' on' : '')} onClick={() => set({ chords: !prefs.chords })}>CHORDS</button>
+          <button class={'tog' + (prefs.compact ? ' on' : '')} aria-label="Fold repeats" onClick={() => set({ compact: !prefs.compact })}>FOLD ↻</button>
+        </div>
       </div>
       <div class="stand-body" ref={body} onScroll={onScroll} onClick={toggle}>
         <div class="stand-sheet">

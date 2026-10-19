@@ -1,15 +1,16 @@
-# PORTASCRIBE // MK-I — Product & Technical Spec (v1)
+# FOOLSCAP — Product & Technical Spec
 
 > A lyric notepad that behaves like a piece of studio hardware instead of an app.
-> Offline-first. No accounts, no API keys, no cloud. Ships as an installable Android APK
+> Offline-first. No accounts, no API keys, no AI writing a word for you. Ships as an Android APK
 > (Capacitor) and still runs as a plain web page / PWA.
 
 ---
 
 ## 1. Vision
 
-Most lyric apps are text editors with a rhyming dictionary stapled on. PORTASCRIBE is built
-around the *process* of writing a song, which is rarely linear:
+Most lyric apps are text editors with a rhyming dictionary stapled on. FOOLSCAP is built
+around the *process* of writing a song, which is rarely linear, and around one specific enemy:
+**perfectionism** — the blank white page that makes every sentence look final.
 
 1. **Catch** a stray line before it escapes.
 2. **Freewrite** from it, fast, without judging.
@@ -17,303 +18,222 @@ around the *process* of writing a song, which is rarely linear:
 4. **Cut up / recombine** until something sparks.
 5. **Build** a structured song — verses, choruses, chords, takes.
 6. **Polish** with rhyme, syllable and rhythm tooling that *shows* you things instead of writing for you.
+7. **Play it through** from a music stand.
 
-Every step is a *physical-feeling* surface. You never open a menu; you flip a switch, turn
-a dial, pull a lever, drag a strip of paper.
+The techniques are borrowed from the writers the app was designed around — Kerouac/Dylan
+(the scroll), Bowie/Burroughs (cut-ups), Waits (scraps of overheard talk), Cohen (stacks of
+drafts per verse), Nick Drake (tunings, a tape running while you write).
 
 ### Design principles
 
 | # | Principle | In practice |
 |---|-----------|-------------|
-| 1 | **The page is sacred** | ≥ 85 % of the screen is unobstructed paper at rest. Tools are *recessed* into the bezel and come out only when needed. |
-| 2 | **Nothing is ever really deleted** | Backspace in the Roll becomes ghost ink. Cut lines fall into the Boneyard. Every destructive action has UNDO. Songs go to a bin, not oblivion. |
-| 3 | **Show, don't write** | No "generate me a verse". The app measures (syllables, rhyme geometry, stress) and offers *raw material* (words, associations) — the writer stays the writer. |
-| 4 | **Every process welcome** | Freewriter, cut-up collagist, guitarist-first, rhyme-schemer, hummer: each has a door, all doors lead into the same data. |
-| 5 | **Works in a tunnel** | 100 % offline for writing, syllables, rhymes (bundled CMU dictionary). Online lookups (Datamuse, dictionary) are a bonus that degrades gracefully. |
-| 6 | **Not a Material app** | No app bar, no hamburger, no FAB, no ripple, no system-looking dialogs. |
+| 1 | **Machine vs. media** | The *machine* is cold, matte and precise: putty aluminium, bone keycaps, one dark LCD. The *media* is warm and imperfect: paper, typewriter ink, wax pencil, masking tape. Never mix them. |
+| 2 | **Nothing is ever really deleted** | Backspace on the Roll strikes through. Cut lines go to the Shoebox. Every destructive action can be undone from the LCD. Tapes keep a history of earlier versions. Binned tapes wait 30 days. |
+| 3 | **Show, don't write** | No "generate me a verse". The app measures (syllables, stress, rhyme geometry) and offers raw material (words, your own scraps). The writer stays the writer. |
+| 4 | **Every process welcome** | Freewriter, collagist, guitarist-first, rhyme-schemer, hummer: each has a door, all doors lead into the same song. |
+| 5 | **One pile, one voice** | Every stray line lives in ONE place (the Shoebox). Every message comes from ONE place (the LCD). |
+| 6 | **Works in a tunnel** | Writing, syllables, rhymes, meter are 100 % offline (bundled CMU dictionary). Online lookups are a bonus that degrades gracefully. |
+| 7 | **Not a Material app** | No app bar, no hamburger, no FAB, no ripple, no floating toasts. |
 
-### Deliberate departures from the first (Gemini-era) draft
+### The notebook comes first (MK-II, second pass)
 
-The original draft leaned on Gemini Live / Flash / Nano Banana. This build runs *outside* AI
-Studio and must need no keys, so:
+Picking a song before you've written a word is a quiet form of pressure. So the app now opens on a **notebook**
+that belongs to no song: a yellow legal pad, dated pages, cursor ready. You ramble there; lines worth keeping are
+punched into the Shoebox, and songs are built from the Shoebox later. The machine shrank to one slim row
+(⏏ TAPES · LCD · dial) so the paper gets the screen. Songs written in MK-I/MK-II keep their freewrites: each song's
+old roll became a notebook page, stamped with the song's name.
 
-| Original idea | v1 replacement (free, offline-first) |
-|---|---|
-| Hum → AI transcribes cadence grid | **Cadence Pad**: tap the rhythm with your thumb (tap = *da*, hold = *DUM*, pause = rest) → a stress template the lines are measured against. Also "steal cadence from this line". |
-| Anti-Cliché Muse (LLM) | **The Reference Wheel**: Datamuse (rhymes, slant rhymes, "triggers", describing adjectives, synonyms, antonyms) + Free Dictionary, with a **meter filter** (same syllable count / same stress). Cliché-avoidance is built in by *showing the long tail*: results are ranked by rarity as an option. |
-| AI cover art | **Generative cover & Lyric Cards** drawn on a canvas, seeded by title + lyrics + ink colour; exportable as PNG for sharing. |
-| Firestore / Drive sync | **Local-first** (IndexedDB) + one-tap **Backup / Restore** to a JSON file and **Share** sheet. Cloud sync is a roadmap item. |
+### What changed from MK-I (and why)
+
+MK-II came out of a design review of MK-I. Most of the review was adopted; where it wasn't, the reason is below.
+
+| MK-I | MK-II | Note |
+|---|---|---|
+| Sparks, Shoebox, Boneyard, Bones tray — four names for "a stray line" | **One Shoebox**, with a provenance stamp (CAUGHT / CUT FROM … / KEPT FROM …) | Old data migrates automatically. |
+| Dark charcoal bezel, glossy colour keys, screws, brushed metal, tilt sheen | **Matte putty** chassis, recessed seams, EP-133-style bone keycaps with the label, LED and symbol printed on the cap | Charcoal stays as an optional finish. |
+| Black floating toasts | **The LCD talks**: every message, hint and UNDO appears there; tap it to act | Chosen over "Dymo labels" so there is exactly one voice. |
+| Table modes (SNIP / TAPE) + a lever | **Modeless**: tap a strip, tap a gap to snip; drop a strip on another's edge to tape; double-tap the mat for a slip; DEAL is a key | Snip by tap rather than two-finger spread: one-handed and discoverable. Single tap on the mat deselects, so new slips need a double-tap. |
+| Radial WHEEL key | **WORDS** key: one tap = rhymes for the word under the caret, tabs for the rest | Not "double-tap a word": in a text field that's the OS's own word selection. |
+| Latch = ghost ink | **Ghost ink always on** (DIP switch), with *typo grace*: the word you are still typing really erases; once it's finished, backspace strikes it through. **LATCH** = forward-only: backspace refused and a paper bail folds away everything but the last lines | The bail is the "only see the last two lines" idea from the very first concept. |
+| Lines/words/clock that started ticking on the first key | Line odometer only; the timer is an opt-in **SPRINT** | |
+| Export key on the Bench | Export from the tape's menu or the Stand | |
+| — | **STAND** music-stand view, **hold-to-hum** per card, **METER** lens with downbeats, rhyme-scheme letters, **CUT-UP**, transpose, tape **history**, **paste-in importer**, memos in backups | |
 
 ---
 
 ## 2. Industrial design language
 
-### 2.1 The chassis — Teenage-Engineering hardware
+### 2.1 The machine
 
-A pocket instrument, not a phone app. Two finishes (DIP switch): **ALUMINIUM** (default — brushed warm-grey
-anodised panel, white/colour rubber keys) and **CHARCOAL**. The paper "screen" sits in a black glass window.
+* **Palette** — putty `#DFDBD2` with a 3 % monochrome noise, seams `#B8B3A8` + highlight `#ECE9E2`, silk-screen charcoal `#2B2A28`, one accent: signal orange `#FF4F00`. Charcoal finish mirrors it.
+* **Top bezel** — one slim row: `[⏏ TAPES key] [LCD] [printed legend NOTEBOOK / TABLE / BENCH + mode dial]`. The song title lives on the paper (typed at the top of the Bench, a scrap of masking tape on the Table). SETUP sits in the Tape Rack.
+* **LCD** — the only dark element. Dot-matrix (Doto). Idle readouts: Notebook `P.38 16 OCT · FWD · PEN · 09:41`; Table `BORROWED ROOM 07`; Bench `V1 C V2 C · RHY · 84 G`; Rack `TAPE RACK 12`; while recording `● REC ▮▮▮▯`. Messages scroll past like a marquee; an action (`UNDO`, `GO`, `PEN`) sits on the right — tap the glass to run it.
+* **Keys** — a dark well, a bone keycap with a 3 px skirt that sinks 2 px on touch-down; LED top-left, 1.5 px technical symbol top-right, label bottom-left. One dark key per surface marks its main action. Five keys per surface. Disabled keys grey out.
+* **Screen well** — paper sits in a shallow tray: 2 px lip, a 2–3 px inner shadow, nothing foggy.
+* **Panels** — sheets and drawers are putty plates that slide up; the scrim never covers the top bezel, so the LCD stays readable.
 
-* **Top bezel**: silkscreen nameplate `PORTASCRIBE [MK-I]` + speaker grille + gear (tap → DIP switches);
-  `RACK` reel button · **label-maker tape** (song title, ink-colour swatch) over an **amber OLED readout**
-  (dot-matrix, context-sensitive: lines/words/sprint clock · strip count/tool · arrangement `V1 C V2 C` + BPM/key)
-  · **rotary dial** (orange cap) with silkscreen legend `ROLL / FREEWRITE`, `TABLE / CUT-UP`, `BENCH / STRUCTURE`.
-* **Bottom keys**: chunky colour-coded rubber keys (yellow, blue, orange, green, ink, white) with printed line icons,
-  bracketed silkscreen legends and a little LED above toggles. Pressed keys physically sink.
-* Screws in the corners; brushed-metal grain; hairline seams. One accent: **signal orange** `#ff5b1f`.
-* Panels that slide over the device (sheets, rack, trays, toast) use a dark **OLED** treatment.
+### 2.2 The media
 
-### 2.1b Three writing surfaces, three physical objects
-
-| Mode | Object | Details |
-|---|---|---|
-| ROLL | **spiral-bound tear-off pad** | coil binding + perforation, ruled paper, red margin; latch/grease tint the binding edge |
-| TABLE | **cork board** | sticky notes (4 colours) held by pushpins or washi tape, taped splices, brushed-metal deal lever |
-| BENCH | **ruled index cards** | red header rule, blue lines, coloured kind-tab on top, stacked-edge shadow when a section has several takes, masking-tape deck strip |
-
-### 2.2 Paper stocks (themes)
-
-| Stock | Feel |
+| Surface | Object |
 |---|---|
-| **NEWSPRINT** (default) | warm greige, fibres, ink-black |
-| **LEGAL** | yellow legal-pad, blue rules, red margin |
-| **GRAPH** | cool bone with faint blue grid |
-| **MIDNIGHT** | warm dark paper, cream ink |
+| NOTEBOOK | a yellow legal pad: glued binding at the top, red double margin, blue rules the type stands on, a red rubber date stamp (dark at MIDNIGHT) |
+| TABLE | a self-healing cutting mat with paper strips (scissor-cut edges, provenance by paper stock) and masking tape |
+| BENCH | ruled index cards with a coloured top edge, a masking-tape deck strip, chrome chord stamps |
+| RACK | cassette J-cards in a moulded tray; the Shoebox as index slips |
+| STAND | one long lead sheet |
 
-Each song also has an **ink colour** (8 marker colours) used for its cassette spine, label swatch, cover card and kind tags.
+Paper stocks: **NEWSPRINT** (default) · **LEGAL** (pink wax) · **GRAPH** · **MIDNIGHT** (dark). The wax pencil is multiplied onto the paper with a rough, textured edge so the type stays crisp on top.
 
 ### 2.3 Type
 
-| Role | Face | Why |
-|---|---|---|
-| Silkscreen / labels | **Barlow Condensed** (caps, tracked) | Teenage-Engineering-style panel print |
-| Data / UI numerals | **Space Mono** | technical |
-| OLED readout | **Doto** (dot-matrix) | the little display |
-| Lyrics (Bench, Roll) | **Courier Prime** | typewriter warmth; *monospace is required* so chord stamps can sit exactly above a character |
-| Display (headers, stamps) | **Special Elite** | worn typewriter |
-| Handwriting (strips, slips, tape labels) | **Caveat** | felt-pen scrawl |
+| Role | Face |
+|---|---|
+| Everything the writer types (Roll, Table, Bench, Shoebox, Stand, fields) | **Courier Prime** — one typewriter face, so a line looks the same wherever it travels |
+| The machine (keys, labels, panels) | **Space Grotesk** |
+| LCD | **Doto** |
 
 ### 2.4 Sound & touch (all synthesised with WebAudio — no audio files)
 
-* Dial detent *click*, key *thock*, latch *clunk*, hole-punch *chk*, scissors *snip*, lever *ratchet*, typewriter *ding* (sprint end).
-* Haptics: light tick per detent, medium for latch/punch/lever. Both independently switchable.
-* Motion: mechanical, short (≤ 180 ms), ease-out with a hint of overshoot. Nothing floaty or "bouncy-Material".
+Mode dial *clack* (rotary detent), TAPES *eject* (spring + ka-chunk), latch *clunk*, DIP *snap*, PUNCH *crunch*,
+scissors *snip*, masking *tape* tear, *shuffle*, refused backspace *thud*, deal *ratchet*, typewriter *ding*.
+Haptics on touch-down. Both switchable. Motion is short, springy, transform-only.
 
 ---
 
 ## 3. Information architecture
 
 ```
-                ┌────────── RACK (drawer, left) ─────────┐
-                │ TAPES (songs) · SHOEBOX · BONEYARD · BIN │
-                └─────────────────────────────────────────┘
- ┌ top bezel: [RACK] [ title tape ............ ] [ DIAL ] ┐
- │                                                         │
- │   ROLL   ──   TABLE   ──   BENCH     (three workspaces, │
- │  freewrite   cut & shuffle  structure  one shared song) │
- │                                                         │
- │ ▌Quick-Catch slip (right-edge tab, available everywhere)│
- └ bottom bezel: context keys ─────────────────────────────┘
-        tray slot (chords / boneyard / results) slides up above the keys
+ ┌ top bezel: [⏏ TAPES] [ LCD ] [ legend · DIAL ] ────────────────┐
+ │                                                               │
+ │ NOTEBOOK ←— one desk, the dial pans across it —→ TABLE  BENCH │
+ │                                                               │
+ │   (TAPES swaps the desk for the Rack, inside the same window) │
+ │ ▌CATCH slip (right edge, on Table and Bench)                  │
+ └ bottom bezel: five context keys ──────────────────────────────┘
 ```
 
-Global objects:
-
-* **Song ("tape")** – owns a Roll, a Table, a Bench (sections + arrangement), memos.
-* **Shoebox** – global pile of *sparks*: raw one-liners, titles, overheard phrases.
-* **Boneyard** – global pile of *bones*: lines cut from songs. Surfaces matches while writing.
-* **Quick-Catch slip** – 2-second capture into the Shoebox from anywhere.
+* **Notebook** – global, made of pages. Belongs to no song. The app always opens on its newest page.
+* **Tape** (song) – owns a Table, a Bench (sections, takes, arrangement), memos, history.
+* **Shoebox** – the one global pile of stray lines. Fed by PUNCH (notebook), CATCH, cut Bench lines, kept Table work. Drained by DRAW (notebook), DEAL (Table), the Shoebox drawer (Bench).
 
 ---
 
-## 4. Surfaces in detail
+## 4. Surfaces
 
-### 4.1 ROLL — free-writing (home base)
+### 4.1 NOTEBOOK — rambling (home)
 
-Continuous warm-newsprint sheet, typewriter face, ruled lines.
+Keys: **LATCH · PEN · DRAW · PUNCH · SPRINT**
 
-* **Draw a Spark** – pulls a random Shoebox line (least-used first) and tapes it above the sheet as a prompt. Tap the slip to type it in as line one. Or type a fresh one.
-* **Forward Latch** (amber LED switch) – when ON, delete/backspace *cannot* remove text. Instead the characters are struck through and remain as **ghost ink** (faint, line-through). Implemented robustly against IME composition (post-hoc restore, not just `beforeinput`).
-* **Odometer** – mechanical rolling counter for LINES / WORDS plus a **sprint clock** (starts on first key). At 5:00 a typewriter *ding* + the Grease Pencil key pulses: *time to harvest*.
-* **Grease Pencil** – a mode switch. Keyboard drops, the sheet becomes a drawing surface: *long-press then drag* over words to highlight in translucent yellow; tap a highlight to un-mark it. Normal swipe still scrolls.
-* **PUNCH TO CARDS** – every un-punched highlight becomes a strip on the Table (ghost ink stripped), the highlight turns into a punched "cut-out", haptic *chk*.
-* Roll text, marks and ghost ranges are stored per song and survive edits (range re-basing on every change).
+* **Pages** — each page carries a red date stamp and a number. Come back after **45 minutes away or on a new day** and a fresh page is waiting (a blank page is reused, never stacked); `+` tears off a new one by hand. `‹ ›` (or a swipe on the header) flips through earlier pages, which stay writable. Tap the date stamp for the index: every page with its date and first line, searchable.
 
-### 4.2 TABLE — cut & shuffle (when stuck)
+* **Ghost ink** — finished words can't be erased: backspace strikes them through in graphite. *Typo grace*: the word you're still typing erases normally. Typing over a selection strikes the old words and writes after them. (DIP: GHOST INK.)
+* **LATCH** — forward only. Backspace is refused with a thud, the caret is pinned to the end, and a paper bail folds away everything above the last lines ("FORWARD ONLY") so you can't reread and judge. Unlatch and the bail lifts.
+* **DRAW** — a random scrap from the Shoebox (least-used first) is taped to the top of the page; ANOTHER / WRITE FROM IT (appends it and puts the caret after it).
+* **PEN** — wax pencil. Tap a phrase (bounded by line breaks and sentence punctuation) to mark it, tap again to clear; press-hold-drag for an exact range.
+* **PUNCH** — every marked phrase is die-cut out (they fly off the page) into the **Shoebox**, stamped `NOTEBOOK P.38`, and stays on the page as a cut-out. The LCD offers ON TABLE to lay them straight onto the current song's Table.
+* **SPRINT** — opt-in timed freewrite (5–60 min). Countdown on the LCD; at the bell the PEN key pulses and the LCD offers PEN.
 
-A cork-and-paper desktop with **strips** (paper slips in marker handwriting) you drag freely.
+### 4.2 TABLE — cut & recombine
 
-* **Sources**: punched Roll highlights, **Deal lever** (pulls 4 random Shoebox/Boneyard fragments), typed strips (`+ STRIP`).
-* **Tools** (bottom keys): `SNIP` (tap a strip between words to cut it), `TAPE` (tap two strips → stack as 2 lines or glue as 1 line), `SHUFFLE` (re-scatter), `DEAL`, `+STRIP`.
-* **Tap a strip** → floating action row: `EDIT` · `→ BENCH` · `BURY` (to Boneyard) · `✕`.
-* **→ BENCH** asks which section to slot into (or a new one), appends as lines to its active take.
-* Positions are stored as fractions of the board so rotation/resizing keeps layout.
+Keys: **SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP**
 
-### 4.3 BENCH — the song sheet
+* Strips are dragged freely (velocity tilt).
+* **Tap** a strip → it's selected: an action row (EDIT · BENCH · keep in SHOEBOX · throw away) and dashed perforations appear in every gap. **Tap a perforation** to snip there.
+* **Drop a strip on another's bottom edge** → taped underneath (two lines); **on its right edge** → taped end to end. A piece of tape previews while you hover. Joints show the tape; snipping a joint peels it.
+* **Double-tap the mat** → a new slip right there. **SLIP** does the same in a free spot.
+* **DEAL** — four scraps from the Shoebox. **CUT-UP** — slices every strip into 2–4-word fragments (Burroughs/Bowie). **SHUFFLE** — re-scatters (FLIP animation). **SWEEP** — clears the mat; typed and taped work is kept in the Shoebox, copies are just cleared. Every one can be undone from the LCD.
+* **→ BENCH** slots a strip into a section (or a new verse/chorus/bridge).
 
-* **Deck strip** (collapsible "masking tape"): **KEY** · **CAPO** · **TUNING** · **BPM** (tap-tempo + metronome with count-in) · **● REC** loop recorder.
-* **Song map**: the *arrangement* as little blocks (`V1 C V2 C B C`). Drag to reorder, long-press for menu (repeat, remove, delete). A section can appear many times; repeats render as slim "↻ CHORUS" slips so you never copy-paste a chorus twice.
-* **Section cards** stacked like index cards:
-  * Header: kind tag (VERSE/PRE/CHORUS/BRIDGE/HOOK/INTRO/OUTRO/TAG) · rename · **take flipper** `‹ 02/04 ›` (swipe the header; `+` = blank or copy-of-this) · `♪` cadence · memo `●`.
-  * Lines: gutter **syllable count** (colour-coded vs cadence), chord lane above text, mono lyric text.
-  * **Enter** splits a line (chords follow), **Backspace at 0** merges up.
-  * **Swipe a line left** → flicks into the **Boneyard** (UNDO toast). Gutter tap → line menu (stress pattern "da-DUM-da", move, duplicate, bury, delete, "use as cadence").
-* **Magnetic chord stamps** – a slim tray of diatonic chords for the song key (or the common set if no key). *Drag* a metal stamp onto any word, or arm one and *tap* a chord lane. Tap a stamp to remove, drag to move. Modifier row: `m 7 maj7 sus4 add9 dim /bass`.
-* **FLOW** (rhyme heat) – toggles colouring of rhyme geometry inside each section: perfect rhymes = tint, slant end-rhymes = dotted underline; internal rhymes included; stop-words ignored.
-* **Boneyard tray** – pull-up tray; **MATCH** tab ranks bones by rhyme with the previous line's end word and syllable count of the focused line; tap to drop in.
-* **Reference Wheel** (see 4.5).
-* **Cadence Pad** (see 4.6).
-* **Memos** – 4-bar loops or voice notes (MediaRecorder → IndexedDB) shown as waveform **pills** pinned to the song or a specific section; tap to play, long-press for loop/rename/delete.
+### 4.3 BENCH — the song
 
-### 4.4 RACK — library (drawer)
+Keys: **WORDS · CHORDS · LENS · SHOEBOX · STAND**
 
-* **TAPES** – cassette-spine list (ink colour, title in marker, line count, edited time). Search across titles *and* lyrics. Swipe left = bin, long-press = duplicate/rename/recolour. New tape button = a blank cassette.
-* **SHOEBOX** – sparks list, add/edit/delete, "send to Roll".
-* **BONEYARD** – bones list, "send to Table / Bench", delete.
-* **BIN** – deleted songs for 30 days.
+* **Deck strip** (masking tape): KEY · CAPO · TUNING · BPM (tap tempo, metronome with count-in) · ● REC scratch tape with spinning reels. Changing KEY transposes every chord stamp (switchable).
+* **Song map** — the arrangement as blocks; repeats are outlined; tap to select → move / repeat / remove (a section's lines go to the Shoebox when its last use is removed).
+* **Cards** — kind tag (rename / re-kind / duplicate), **takes** `‹ 02/04 ›` (swipe the header, 3D page flip), ♪ cadence, 🎤 **hold-to-hum**: press and hold to record how this section goes, let go to keep it (pinned to the card).
+* **Lines** — syllable gutter (coloured against the cadence; ≠ for stress mismatch; tap for the line menu), Enter splits, Backspace at 0 merges, multi-line paste splits. **Swipe left** → cut into the Shoebox.
+* **WORDS** — the word under the caret: RHYME · SLANT · SENSE · LIKE · OPPOSE · DEFINE tabs; filters = syllables, STRESS, RARE; tap a word to swap it in (case kept). With no caret it's a free lookup.
+* **CHORDS** — diatonic stamps for the key, modifiers, custom; drag onto a word or arm + tap.
+* **LENS** (cycles) — **RHYME**: perfect rhymes tinted, slant end-rhymes dotted, **scheme letters** (AABB…) in the margin. **METER**: scansion marks (`/` stressed, `˘` unstressed, `\` secondary) over every syllable; tap a word to flip a one-syllable word's stress, then to mark a **downbeat** bar before it, then back. Overrides feed the cadence fit.
+* **SHOEBOX** drawer — MATCH ranks scraps that rhyme with the line above and fit this line's length; ALL. Tap to drop in.
+* **STAND** — see 4.5.
 
-### 4.5 Reference Wheel (replaces "pop-up menus")
+### 4.4 TAPE RACK (⏏ TAPES)
 
-Press-and-slide a hardware key; a mechanical wheel opens around your thumb with six sectors:
+Shown inside the screen well; the bottom keys become **NEW · PASTE IN · TAPES · SHOEBOX · BIN**.
 
-| Sector | Source | Notes |
-|---|---|---|
-| **RHYME** | CMU (offline) + Datamuse `rel_rhy` | stress-aware perfect rhymes |
-| **SLANT** | CMU (offline) + Datamuse `rel_nry` | assonance / near rhymes |
-| **SENSE** | Datamuse `rel_jjb` + `rel_trg` + `ml` | imagery: adjectives & associations |
-| **LIKE** | Datamuse `rel_syn` | synonyms |
-| **OPPOSE** | Datamuse `rel_ant` | antonyms |
-| **DEFINE** | dictionaryapi.dev | definitions, examples |
+* **TAPES** — J-card spines: ink stripe, title, first line, KEY · BPM · sections · lines · edited. Tap to load; ⋯ → spine colour, rename, duplicate, **history**, export · share, bin. Search covers titles and lyrics.
+* **History** — earlier states are snapshotted automatically (at most every 3 min of editing, last 80 kept). Preview one, then ROLL BACK (the newer state is snapshotted first) or open AS A COPY.
+* **PASTE IN** — plain lyrics, chords-over-lyrics, `[Verse 1]` / `Chorus:` / `Chorus x2` headers, or ChordPro (`{title}`, `{key}`, `{tempo}`, `{soc}`, `[Am]`…). Blank lines split sections; a block that comes back word for word becomes the chorus; bare repeated headers become repeats.
+* **SHOEBOX** — index slips with provenance and DRAWN n×; catch a line, write from it on the Roll, lay it on the Table, edit, throw away.
+* **BIN** — 30 days, restore or erase.
 
-Results land in a tray as chips with syllable superscripts. Filters: `= N SYL` (match the selected word) and `STRESS` (match stress pattern, via CMU on the candidate). Tapping a chip swaps the word (case & punctuation preserved). Online results are cached in IndexedDB; offline falls back to CMU for rhymes and says "NO SIGNAL" for the rest.
+### 4.5 STAND — play it through
 
-### 4.6 Cadence Pad
+The whole arrangement on one lead sheet in the current paper stock, chords hung over the words they land on (and never torn from them when lines wrap). **SCROLL** auto-scrolls paced by the tempo (one sung line ≈ two bars of 4/4 at 1.0×), speed ±, A−/A+, CHORDS on/off, FOLD repeats. Tap the sheet to start/stop; the chrome hides while scrolling. Keeps the screen awake.
 
-Per-section rhythm template, shown as tiles `da · DUM · rest`.
+### 4.6 CATCH, SETUP, export
 
-* **Tap it out**: tap = *da*, hold ≥ 220 ms = *DUM*, a pause > 1.6× the median gap inserts a rest.
-* Or build with buttons, or **steal** the stress pattern of any line.
-* Gutter numbers colour: on-template (ink), ±1 (ochre), further (red). Stress mismatch gets a small `≠` mark.
-
-### 4.7 Quick-Catch slip, Dip-switches, Export
-
-* **Slip** – a paper tab at the right edge; tap or pull it to write one line → Shoebox. Back button/outside tap closes.
-* **Dip-switch panel** (tap the nameplate): paper stock · haptics · click sounds · typewriter keys · paper grain · text size · syllable gutter · online lookups · keep screen on · left-handed (flips dial & keys) · backup / restore · credits.
-* **Export** (Share sheet / copy): plain text, Markdown, **ChordPro** (`[Am]` inline), chord-over-lyric text, JSON backup. **Lyric Card** → PNG poster (generative background from the ink colour + title seed).
+* **CATCH** — a slip peeking from the right edge on every surface. Type, Enter, Enter… DONE. The LCD confirms.
+* **SETUP** (DIP switches) — finish, paper, type size, ghost ink, syllable gutter, online lookups, keep screen on, left-handed, haptics, sounds, typewriter keys, paper grain, backup/restore (memos included).
+* **Export** — lyrics, chords-over, ChordPro, Markdown; copy / file / share; generative **Lyric Card** PNG.
 
 ---
 
 ## 5. Writing engine
 
-### 5.1 Pronunciation (offline)
-
-Bundled **CMU Pronouncing Dictionary** (~126 k words, BSD-style licence), compacted to a sorted
-text file (`src/data/cmu.txt`, 1 char per phone) and binary-searched at runtime — no big Map in memory.
-
-* **Syllables** = vowel phones. OOV words fall back to a vowel-group heuristic.
-* **Stress** per syllable (primary → `S`; secondary/none → `u`; content monosyllables → `S`, function monosyllables → `u`).
-* **Rhyme key** = phones from the last stressed vowel to the end, stress stripped.
-* **Slant key** = the stressed vowel only (assonance).
-* **Offline rhyme search** scans the dictionary for matching keys.
-
-### 5.2 Flow view
-
-For each section: tokenise lines → group tokens by rhyme key (≥ 2 distinct words) → assign ink colours.
-End-words additionally group by slant key. Stop-words never form internal groups.
-
-### 5.3 Ghost-ink model
-
-`marks: {id, s, e, kind: 'ghost'|'pencil', punched?}`. Each `input` event is diffed against the previous
-text (common prefix/suffix) and every mark is **re-based**. In latch mode a pure deletion is reverted and the
-deleted span (plus extra characters leftwards if the span was already ghost) becomes a ghost mark.
-
----
+* **Pronunciation** — bundled CMU dictionary (~126 k words), 1 char/phone, binary-searched. Syllables = vowel phones; OOV fallback by vowel groups.
+* **Stress** — per syllable (`S` primary, `s` secondary, `u` none); one-syllable function words `u`, content words `S`. Per-word overrides keyed `${index}:${word}` so they fall away when the word changes.
+* **Rhyme** — key from the last stressed vowel; slant key = stressed vowel. Flow analysis groups perfect rhymes (≥ 2 distinct words) then slant end-rhymes; scheme letters come from the end-word groups.
+* **Ghost ink** — `marks {s,e,kind:'ghost'|'pencil',punched?}` re-based on every edit (diff of common prefix/suffix). Handlers read live store state, never the render closure (several input events can arrive between renders).
+* **Importer** — two passes: rows → blocks (headers, directives, chord lines → column-anchored chords, inline `[C]`), then blocks → sections + arrangement.
+* **Cut-up** — 2–4-word fragments, never leaving a single word at the end.
 
 ## 6. Data model (IndexedDB, local-first)
 
 ```ts
+Page    { id, n, createdAt, updatedAt, text, marks[], spark?, fromSong? }   // the notebook
 Song    { id, title, ink, createdAt, updatedAt, deletedAt?, bpm, key?, capo, tuning,
-          roll{ text, marks[], spark?, sprintMs }, table: Strip[],
+          roll{…legacy, migrated to pages}, table: Strip[],
           sections: Section[], arrangement: {id, sectionId}[], memos: Memo[] }
 Section { id, kind, name?, take, takes: Take[], cadence?: ('u'|'S'|'r')[] }
 Take    { id, lines: Line[] }
-Line    { id, text, chords: {at, name}[] }
-Strip   { id, text, x, y, rot, z, from }                 // x,y in 0..1 of board
-Scrap   { id, text, kind: 'spark'|'bone', createdAt, songId?, used }
-Memo    { id, sectionId?, label, durMs, peaks[], mime }   // blob stored separately
-Settings{ paper, haptics, clicks, keys, grain, textSize, gutter, online, awake, leftHand, … }
+Line    { id, text, chords: {at, name}[], meter?: { [`${i}:${word}`]: { s?, d? } } }
+Strip   { id, text, x, y, rot, z, from: 'roll'|'deal'|'typed'|'splice'|'cut', joints?: number[] }
+Scrap   { id, text, from: 'catch'|'cut'|'table'|'roll'(notebook), createdAt, songId?, page?, used }
+Memo    { id, sectionId?, label, durMs, peaks[], mime }        // audio blob stored separately
+Settings{ paper, chassis, haptics, clicks, keys, grain, textSize, gutter, online, awake, leftHand, ghost, sprint }
 ```
 
-Stores: `songs`, `scraps`, `blobs`, `kv` (settings, API cache). Writes are debounced per song and flushed on `pagehide`.
+Stores: `songs`, `scraps`, `blobs`, `kv`, `history`, `pages` (DB v3; on first run the old rolls become pages, once). Writes are debounced per song and flushed on `pagehide`;
+the version being overwritten becomes a history snapshot when the last one is ≥ 3 min old.
+Backups: `{app:'portascribe', version:3, songs, scraps, pages, blobs:{memoId: dataURL}}`.
 
 ## 7. Integrations (all free, no key)
 
 | Service | Used for | Offline behaviour |
 |---|---|---|
-| CMU dict (bundled) | syllables, stress, rhyme, flow view | full |
-| **Datamuse** `api.datamuse.com` | rhyme/slant ranking, associations, synonyms | cached → CMU fallback |
-| **Free Dictionary** `api.dictionaryapi.dev` | definitions | cached → "NO SIGNAL" |
-| WebAudio | clicks, metronome, waveform | local |
-| MediaRecorder | memos | local |
+| CMU dict (bundled) | syllables, stress, rhyme, lenses, offline rhymes | full |
+| Datamuse `api.datamuse.com` | rhyme/slant ranking, sense, synonyms, antonyms | cached → CMU fallback |
+| Free Dictionary `api.dictionaryapi.dev` | definitions | cached → "NO SIGNAL" |
+| WebAudio · MediaRecorder | sounds, metronome, memos | local |
 | Capacitor Haptics / Share / Filesystem / App / StatusBar | native feel, export, back button | local |
 
 ## 8. Architecture
 
-* **Vite + TypeScript + Preact + @preact/signals + immer**; plain hand-written CSS with design tokens. ~100 KB gz JS before the dictionary.
-* **Capacitor 8** wraps `dist/` into an Android project (`android/`). `minSdk 24`. Permissions: `RECORD_AUDIO`.
-* App state lives in signals; persistence is a side-effect subscriber (no component writes to IDB directly).
-* Pure engine modules (`src/engine/*`) are unit-tested with Vitest; UI is smoke-tested with Playwright at phone viewport.
-* CI: GitHub Actions builds a debug APK on every push and attaches it as an artifact.
+Vite + TypeScript + Preact (+ signals, immer); hand-written CSS with tokens; Capacitor 8 → Android (`minSdk 24`, `RECORD_AUDIO`).
+State lives in signals; persistence is a side-effect subscriber. All sheets render through one overlay layer at the chassis level.
+The three surfaces are panes on one "desk"; the outgoing pane stays mounted for the 420 ms pan.
 
-## 9. v1 scope
+## 9. Verification
 
-**In:** everything in §4 except items listed under roadmap.
-**Out / roadmap:** cloud sync (Drive/Firestore), Android *share-into-Portascribe* intent, home-screen quick-catch widget, collaborative writing with friends, audio-to-MIDI hum capture, lyric-video export, Play Store signing/listing, iOS build.
+* `npm test` — engine unit tests (dictionary, syllables, stress, rhyme, scheme, diff/rebase, cadence, music, transpose, importer, meter overrides, migration, export).
+* `scripts/e2e/flows.mjs` — ~70 interactions at phone size: typo grace, ghost ink, latch & bail, draw, pen tap/drag, punch → table, deal, drag, snip, tape, cut-up + LCD undo, shuffle, sweep + undo, double-tap slip, slot to bench, split/merge, chord drag, swipe → shoebox, shoebox drawer, words swap, tabs, both lenses + meter override, transpose, stand auto-scroll, catch, rack shoebox, history, paste-in import, finish switch.
+* `scripts/e2e/persist.mjs` (production bundle), `upgrade.mjs` (an MK-I/MK-II database opened by this build: rolls → pages, bones → shoebox, migration runs once), `perf.mjs` (4× CPU throttle), `tour.mjs` / `sheets.mjs` (screenshots).
 
-## 10. Acceptance checklist (v1)
+## 10. Roadmap
 
-* [ ] Cold start < 2 s on mid-range Android; fully usable offline.
-* [ ] Roll: typing, latch ghost ink, grease highlight, punch → strips on Table.
-* [ ] Table: drag, snip, tape, shuffle, deal, → Bench.
-* [ ] Bench: lines, takes, arrangement, chords, flow view, syllable gutter, boneyard flick, cadence.
-* [ ] Wheel returns rhymes offline and associations online.
-* [ ] Memo record/play/loop works in the APK (mic permission prompt).
-* [ ] Export text / ChordPro / backup JSON; import backup.
-* [ ] Back button closes overlays before leaving the app.
-* [ ] Debug APK installs and launches.
-
----
-
-## 11. Build status (v0.1.0)
-
-Implemented: everything in §4 except items below. Verified with 22 unit tests (engine) and a Playwright
-interaction suite (`scripts/e2e/flows.mjs`: typing, latch/ghost ink, grease → punch → table, strip drag/snip/lever,
-slot-to-bench, line split/merge, chord drag, swipe-to-boneyard, wheel → rhyme → swap word, rack, slip, settings).
-
-Known gaps / next:
-* Voice-memo audio is stored on-device but **not included in JSON backups** yet.
-* Debug APK only (signed with the Android debug key); no Play Store release signing yet.
-* Not yet exercised on a physical device in this session (no emulator available) — the APK is structurally verified
-  (manifest, permissions, signature, bundled assets). First on-device pass should check IME behaviour for the Roll's
-  latch (Gboard composition) and microphone permission flow.
-* Section reorder uses ◀ ▶ on the song map rather than free dragging.
-* Roadmap: cloud sync, Android share-into-Portascribe intent, home-screen quick-catch widget, collaborative writing.
-
-## 12. Depth & performance pass
-
-**Materials** (light from top-left, elevation = layered shadows): keys are a dark recessed *socket*, a static *side wall*
-and a *moving cap* — pressing is a pure `transform` (no shadow repaint) driven by spring easing (`linear()` curves);
-the dial is machined metal (conic-gradient brushed top, knurled ridges, orange cap, fixed specular gloss);
-the screen has a chamfered glass frame with reflection; the Roll pad has page curvature and a coil that casts a shadow;
-Table notes curl at the corner and are held by domed pins/washi tape and lift + tilt with finger velocity;
-Bench cards are thicker with stacked take edges and a 3D page-flip between takes; chord stamps are brushed chrome.
-A soft specular **tilt sheen** drifts across the chassis with the phone's orientation (DIP switch: TILT LIGHTING).
-
-**120 Hz budget (8.3 ms/frame)**
-* Press/drag/lever/dial/line-swipe write `transform` directly to the DOM — no component re-render per pointer move.
-* Shuffle uses FLIP (WAAPI transforms) instead of animating `left/top`.
-* The Roll mirror is in normal flow so the page height needs no JS measurement; readout counts are throttled.
-* Key feedback (sound + haptic) fires on pointer-*down*; `touch-action: manipulation` removes tap delay.
-* `MainActivity` requests the display's highest refresh mode at the current resolution (90/120/144 Hz) so WebView
-  content isn't capped at 60 Hz.
-* Measured with `scripts/e2e/perf.mjs` (4× CPU throttle): long-roll typing layout 13.9 → 8.2 ms/key, long tasks 24 → 0;
-  strip drag layout 0.6 → 0 ms/move.
+Android *share-into-Portascribe* intent (catch from any app), home-screen CATCH widget, cloud sync, collaborative
+writing, per-line alternates, Play Store signing. Physical-device pass still to do: Gboard composition with ghost ink
+and the latch, mic permission on first hold-to-hum.

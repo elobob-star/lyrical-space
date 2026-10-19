@@ -13,7 +13,8 @@ import { Stand } from './ui/Stand';
 import { loadCmu } from './engine/cmuLoader';
 import { resetWordCache } from './engine/words';
 import { onCmuReady } from './engine/cmu';
-import { cmuTick } from './store/ui';
+import { cmuTick, say } from './store/ui';
+import { setOnFreshPage } from './store/notebook';
 
 const ORDER: Record<Mode, number> = { roll: 0, table: 1, bench: 2 };
 const VIEWS: Record<Mode, () => preact.JSX.Element> = { roll: RollView, table: TableView, bench: BenchView };
@@ -38,7 +39,8 @@ function Desk() {
     <div class="desk">
       {panes.map((p) => {
         const View = VIEWS[p.m];
-        return <div class={'pane ' + p.cls} key={p.m + song.id} aria-hidden={p.m !== m}><View /></div>;
+        // the notebook belongs to no song, so it doesn't reload when the tape changes
+        return <div class={'pane ' + p.cls} key={p.m === 'roll' ? 'notebook' : p.m + song.id} aria-hidden={p.m !== m}><View /></div>;
       })}
     </div>
   );
@@ -47,6 +49,7 @@ function Desk() {
 export function App() {
   useEffect(() => {
     void boot();
+    setOnFreshPage(() => { if (mode.peek() === 'roll') say('A FRESH PAGE — THE LAST ONE IS A FLIP BACK'); });
     const idle = (window as any).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300));
     onCmuReady(() => { resetWordCache(); cmuTick.value++; });
     idle(() => void loadCmu());
@@ -121,7 +124,7 @@ export function App() {
   const ly = layer.value;
   useEffect(() => { if (ly === 'rack') (document.activeElement as HTMLElement | null)?.blur?.(); }, [ly]);
 
-  if (!ready.value) return <div class="chassis boot" data-chassis="alu"><div class="boot-msg">PORTASCRIBE MK-II<br /><small>WARMING UP…</small></div></div>;
+  if (!ready.value) return <div class="chassis boot" data-chassis="alu"><div class="boot-msg">FOOLSCAP<br /><small>WARMING UP…</small></div></div>;
 
   const st = settings.value;
   const m = mode.value;
@@ -134,11 +137,12 @@ export function App() {
         <div class="paper-bg" />
         <Desk />
         {rack && <Rack />}
-        {!rack && <Slip />}
+        {!rack && m !== 'roll' && <Slip />}
       </div>
       <div class="bezel-bottom" onMouseDown={(e) => { if ((e.target as HTMLElement).closest('.key')) e.preventDefault(); }}>
         {rack ? <RackKeys /> : m === 'roll' ? <RollKeys /> : m === 'table' ? <TableKeys /> : <BenchKeys />}
       </div>
+      <div id="overlays" />
       {ly === 'settings' && <Settings />}
       {ly === 'export' && <ExportSheet />}
       {ly === 'stand' && <Stand />}

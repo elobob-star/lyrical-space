@@ -21,7 +21,7 @@ export function Settings() {
   const close = () => { layer.value = null; };
   const file = useRef<HTMLInputElement>(null);
   return (
-    <Sheet title={`SETUP · MK-II v${version}`} onClose={close}>
+    <Sheet title={`SETUP · FOOLSCAP v${version}`} onClose={close}>
       <div class="grp">FINISH</div>
       <div class="seg">
         {(['alu', 'charcoal'] as Chassis[]).map((c) => (
@@ -54,7 +54,7 @@ export function Settings() {
         <button class="btn" onClick={async () => {
           say('PACKING THE BACKUP…');
           const json = await backupAll();
-          void shareFile(`portascribe-backup-${new Date().toISOString().slice(0, 10)}.json`, new Blob([json], { type: 'application/json' }), 'Portascribe backup');
+          void shareFile(`foolscap-backup-${new Date().toISOString().slice(0, 10)}.json`, new Blob([json], { type: 'application/json' }), 'Foolscap backup');
         }}>BACKUP ALL</button>
         <button class="btn" onClick={() => file.current?.click()}>RESTORE…</button>
         <input ref={file} class="hidden-file" type="file" accept="application/json,.json" onChange={async (e) => {
@@ -62,8 +62,8 @@ export function Settings() {
           if (!f) return;
           try {
             const r = await importBackup(await f.text());
-            say(`RESTORED ${r.songs} TAPES, ${r.scraps} SCRAPS`);
-          } catch { say('THAT FILE IS NOT A PORTASCRIBE BACKUP'); }
+            say(`RESTORED ${r.songs} TAPES, ${r.scraps} SCRAPS, ${r.pages} PAGES`);
+          } catch { say('THAT FILE IS NOT A FOOLSCAP BACKUP'); }
           (e.target as HTMLInputElement).value = '';
         }} />
       </div>

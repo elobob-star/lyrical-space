@@ -1,19 +1,26 @@
 import { ComponentChildren } from 'preact';
+import { createPortal } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useBackClose } from '../store/ui';
 import { Icon } from './icons';
 
+/** Overlays render into one layer at the top of the chassis, so a sheet opened from anywhere sits above everything. */
+export function Overlay({ children }: { children: ComponentChildren }) {
+  const host = document.getElementById('overlays');
+  return host ? createPortal(<>{children}</>, host) : <>{children}</>;
+}
+
 export function Sheet({ title, onClose, children, right }: { title: string; onClose: () => void; children: ComponentChildren; right?: ComponentChildren }) {
   useBackClose(true, onClose);
   return (
-    <>
+    <Overlay>
       <div class="scrim" onClick={onClose} />
       <div class="sheet" role="dialog" aria-label={title}>
         <div class="grab" />
         <h3><span>{title}</span><span class="row">{right}<button class="btn small" onClick={onClose} aria-label="Close"><Icon n="close" size={13} stroke={2} /></button></span></h3>
         <div class="body">{children}</div>
       </div>
-    </>
+    </Overlay>
   );
 }
 

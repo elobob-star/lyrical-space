@@ -75,7 +75,7 @@ export async function renderCard(o: CardOpts): Promise<HTMLCanvasElement> {
   g.fillStyle = st.fg; g.font = '700 22px "Space Grotesk", sans-serif';
   g.textBaseline = 'alphabetic';
   (g as any).letterSpacing = '8px';
-  g.fillText('PORTASCRIBE  MK-II', 80, 96);
+  g.fillText('FOOLSCAP', 80, 96);
   g.textAlign = 'right'; g.fillStyle = o.ink; g.fillText('●', W - 80, 96); g.textAlign = 'left';
   (g as any).letterSpacing = '0px';
 

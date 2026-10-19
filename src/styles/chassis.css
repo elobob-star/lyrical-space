@@ -17,7 +17,7 @@ input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user
 .seam { height: 0; border-top: 1.5px solid var(--seam); border-bottom: 1px solid var(--seam-hi); }
 
 /* ---------- top bezel ---------- */
-.bezel-top { flex: none; padding: calc(var(--safe-top) + 6px) 10px 8px; position: relative; z-index: 40; }
+.bezel-top { flex: none; padding: calc(var(--safe-top) + 7px) 10px 7px; position: relative; z-index: 40; }
 .nameplate { display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 2px; }
 .nameplate .brand { font: 700 11px var(--font-ui); letter-spacing: .3em; color: var(--silk); }
 .nameplate .mk { font: 700 8.5px var(--font-ui); letter-spacing: .12em; color: var(--silk); padding: 1.5px 4px 1px; border: 1.3px solid var(--silk); border-radius: 2px; }
@@ -34,9 +34,12 @@ input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user
 @keyframes blink { 50% { opacity: .25; } }
 
 .bezel-row { display: flex; align-items: center; gap: 8px; }
-.bezel-row .eject { flex: none; width: 48px; display: flex; }
-.bezel-row .eject .key { height: 60px; }
-.kb-open .bezel-row .eject .key { height: 48px; }
+.bezel-row .eject { flex: none; width: 46px; display: flex; }
+.bezel-row .eject .key { height: 46px; }
+.bezel-row .eject .key .klab { font-size: 8px; }
+.kb-open .bezel-row .eject .key { height: 38px; }
+.kb-open .bezel-row .eject .key .ksym { display: block; top: 50%; right: 50%; margin: -8px -8px 0 0; }
+.kb-open .bezel-row .eject .key .klab { display: none; }
 .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
 /* label-maker strip: the tape currently in the deck */
@@ -52,7 +55,7 @@ input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user
 
 /* the one dark element on the machine: a dot-matrix LCD that does all the talking */
 .lcd {
-  height: 26px; border-radius: 4px; padding: 0 8px; display: flex; align-items: center; gap: 9px; overflow: hidden; position: relative; flex: none; width: 100%; text-align: left;
+  height: 34px; border-radius: 4px; padding: 0 9px; display: flex; align-items: center; gap: 9px; overflow: hidden; position: relative; flex: none; width: 100%; text-align: left;
   background: var(--lcd-bg); color: var(--lcd-ink); font: 700 12.5px/1 var(--font-lcd); letter-spacing: .03em; text-transform: uppercase; white-space: nowrap;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 0 0 1.5px var(--screen-lip), 0 1.5px 0 1.5px var(--seam-hi);
 }
@@ -74,21 +77,21 @@ input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user
 
 /* mode dial + printed legend */
 .dial-wrap { display: flex; align-items: center; gap: 6px; flex: none; }
-.legend { display: flex; flex-direction: column; gap: 3px; text-align: right; }
+.legend { display: flex; flex-direction: column; gap: 1px; text-align: right; }
 .legend button { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; padding: 1px 0; color: var(--silk-3); }
-.legend button b { font: 700 10px var(--font-ui); letter-spacing: .16em; }
+.legend button b { font: 700 9px var(--font-ui); letter-spacing: .12em; }
 .legend button small { font: 500 7px var(--font-ui); letter-spacing: .12em; margin-top: 1px; }
 .legend button.on { color: var(--silk); }
 .legend button.on b { color: var(--accent); }
-.dial { width: 60px; height: 60px; position: relative; flex: none; touch-action: none; border-radius: 50%; contain: layout style; }
+.dial { width: 48px; height: 48px; position: relative; flex: none; touch-action: none; border-radius: 50%; contain: layout style; }
 .dial .d-well { position: absolute; inset: 0; border-radius: 50%; background: var(--well); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .4), 0 1px 0 var(--seam-hi); }
 .dial .d-ticks { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.dial .d-metal { position: absolute; inset: 6px; border-radius: 50%; background: var(--capd); box-shadow: 0 2px 0 var(--capd-edge), 0 3px 4px rgba(0, 0, 0, .25); }
-.dial .d-rot { position: absolute; inset: 6px; border-radius: 50%; will-change: transform; transition: transform .5s var(--spring); }
+.dial .d-metal { position: absolute; inset: 5px; border-radius: 50%; background: var(--capd); box-shadow: 0 2px 0 var(--capd-edge), 0 3px 4px rgba(0, 0, 0, .25); }
+.dial .d-rot { position: absolute; inset: 5px; border-radius: 50%; will-change: transform; transition: transform .5s var(--spring); }
 .dial.drag .d-rot { transition: none; }
 .dial .d-rot::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: repeating-conic-gradient(rgba(255, 255, 255, .13) 0 2deg, transparent 2deg 9deg); -webkit-mask: radial-gradient(circle, transparent 64%, #000 66%); mask: radial-gradient(circle, transparent 64%, #000 66%); }
-.dial .d-cap { position: absolute; inset: 8px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ff6a24, var(--accent) 70%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -1.5px 2px rgba(0, 0, 0, .18), 0 1px 1px rgba(0, 0, 0, .3); }
-.dial .d-ind { position: absolute; left: 50%; top: 10px; width: 3px; height: 11px; margin-left: -1.5px; border-radius: 2px; background: #fff; }
+.dial .d-cap { position: absolute; inset: 6px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ff6a24, var(--accent) 70%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -1.5px 2px rgba(0, 0, 0, .18), 0 1px 1px rgba(0, 0, 0, .3); }
+.dial .d-ind { position: absolute; left: 50%; top: 8px; width: 2.5px; height: 9px; margin-left: -1.5px; border-radius: 2px; background: #fff; }
 .dial .d-gloss { display: none; }
 
 /* =====================================================================
@@ -150,7 +153,8 @@ input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user
 /* keyboard up: the bezel tightens */
 .kb-open .nameplate, .kb-open .bezel-top > .seam { display: none; }
 .kb-open .bezel-top { padding-top: calc(var(--safe-top) + 5px); padding-bottom: 5px; }
-.kb-open .dial { width: 48px; height: 48px; }
+.kb-open .dial { width: 40px; height: 40px; }
+.kb-open .lcd { height: 30px; }
 .kb-open .legend small { display: none; }
 .kb-open .bezel-bottom { padding-top: 6px; padding-bottom: calc(var(--safe-bottom) + 6px); }
 .kb-open .key { height: 36px; }

@@ -231,10 +231,11 @@ export function TableView() {
     <div class="mode-view table">
       <div class="board" ref={board} onPointerUp={onMat as any}>
         <div class="mat-rule" aria-hidden="true" />
+        <div class="mat-label" aria-hidden="true">{song.title}</div>
         {strips.length === 0 && (
           <div class="empty-table">
             <b>AN EMPTY TABLE</b>
-            <span>Punch lines out of the ROLL, press DEAL for scraps from the shoebox, or double-tap the mat to write a slip.</span>
+            <span>Press DEAL for lines from the shoebox — punched from the notebook or caught along the way — or double-tap the mat to write a slip.</span>
           </div>
         )}
         {strips.map((s) => {
@@ -250,7 +251,7 @@ export function TableView() {
         })}
         {selStrip && (
           <div class="strip-actions" style={{
-            left: `${Math.max(2, Math.min(52, selStrip.x * 100))}%`,
+            left: `clamp(4px, ${selStrip.x * 100}%, calc(100% - 232px))`,
             top: selStrip.y > 0.12 ? `calc(${selStrip.y * 100}% - 48px)` : `calc(${selStrip.y * 100}% + 64px)`, zIndex: 1000,
           }}>
             <button onClick={() => { sheetState.value = { kind: 'edit', id: selStrip.id }; }}><Icon n="edit" size={14} />EDIT</button>

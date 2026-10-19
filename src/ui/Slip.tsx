@@ -3,6 +3,7 @@ import { addScrap, currentSong, scraps } from '../store/state';
 import { say, slipOpen, useBackClose } from '../store/ui';
 import { feel } from '../engine/feel';
 import { Icon } from './icons';
+import { Overlay } from './Sheet';
 
 /** CATCH: a slip of paper always peeking out of the right edge. One line in, straight into the Shoebox. */
 export function Slip() {
@@ -35,7 +36,7 @@ export function Slip() {
         <span>CATCH</span>
       </button>
       {open && (
-        <>
+        <Overlay>
           <div class="slip-scrim" onClick={close} />
           <div class="slip-pop" role="dialog" aria-label="Catch a line">
             <span class="tape-bit" />
@@ -48,7 +49,7 @@ export function Slip() {
               <button class="go" onClick={file}><Icon n="box" size={14} /> INTO THE BOX</button>
             </div>
           </div>
-        </>
+        </Overlay>
       )}
     </>
   );
