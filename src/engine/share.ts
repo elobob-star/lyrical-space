@@ -30,30 +30,32 @@ function download(name: string, blob: Blob): void {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-const toBase64 = (blob: Blob) => new Promise<string>((res, rej) => {
+export const toBase64 = (blob: Blob) => new Promise<string>((res, rej) => {
   const r = new FileReader();
   r.onload = () => res(String(r.result).split(',')[1] ?? '');
   r.onerror = () => rej(r.error);
   r.readAsDataURL(blob);
 });
 
-/** Share a text file (txt / json / cho / md). On Android this opens the system share sheet. */
-export async function shareFile(name: string, blob: Blob, title: string): Promise<void> {
+/** Share a file (txt / json / cho / md). On a phone this opens the system share sheet. True once it went somewhere. */
+export async function shareFile(name: string, blob: Blob, title: string): Promise<boolean> {
   try {
     if (native()) {
       const { Filesystem, Directory } = await import('@capacitor/filesystem');
       const { Share } = await import('@capacitor/share');
       const w = await Filesystem.writeFile({ path: name, data: await toBase64(blob), directory: Directory.Cache });
       await Share.share({ title, url: w.uri, dialogTitle: title });
-      return;
+      return true;
     }
     const file = new File([blob], name, { type: blob.type });
-    if ((navigator as any).canShare?.({ files: [file] })) { await (navigator as any).share({ files: [file], title }); return; }
+    if ((navigator as any).canShare?.({ files: [file] })) { await (navigator as any).share({ files: [file], title }); return true; }
     download(name, blob);
+    return true;
   } catch (e: any) {
-    if (e?.name === 'AbortError' || /cancel/i.test(String(e?.message))) return;
+    if (e?.name === 'AbortError' || /cancel/i.test(String(e?.message))) return false;
     say('SHARE FAILED — SAVED TO DOWNLOADS INSTEAD');
     download(name, blob);
+    return true;
   }
 }
 

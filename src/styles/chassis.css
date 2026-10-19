@@ -301,3 +301,11 @@ input, textarea { font: inherit; color: inherit; user-select: text; -webkit-user
 
 @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 .dial .tk { stroke: var(--silk-3); } .dial .tk.on { stroke: var(--accent); }
+/* where the work is kept, besides the app */
+.folder-box { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; padding: 11px 12px 12px; border-radius: 9px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--panel-line); }
+.folder-box b { display: flex; align-items: center; gap: 7px; font: 700 9.5px var(--font-ui); letter-spacing: .16em; color: var(--silk); }
+.folder-box small { font: 400 11.5px/1.5 var(--font-ui); color: var(--silk-2); }
+.folder-box .btn { margin-top: 4px; }
+.folder-box .row { margin: 4px 0 0; }
+.folder-box .row .btn { margin-top: 0; }
+.folder-box.warn { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--red) 55%, transparent); }

@@ -163,8 +163,9 @@ export function addLineAfter(songId: ID, sid: ID, lid: ID | null, text = ''): ID
 export function moveLine(songId: ID, sid: ID, lid: ID, dir: -1 | 1): void {
   const lines0 = songById(songId) && takeOf(songById(songId)!, sid)?.lines;
   const i0 = lines0 ? lines0.findIndex((x) => x.id === lid) : -1;
-  if (!lines0 || i0 < 0 || i0 + dir < 0 || i0 + dir >= lines0.length) return; // nowhere to go: nothing to undo
-  recordTake(songId, sid, 'MOVE LINE');
+  if (!lines0 || i0 < 0 || i0 + dir < 0 || i0 + dir >= lines0.length) return; // nowhere to go
+  // moving is not an undo step: it is as easy to move it back by hand
+  burst = null;
   updateSong(songId, (d) => {
     const t = takeOf(d, sid);
     if (!t) return;
@@ -272,7 +273,6 @@ export function repeatEntry(songId: ID, entryId: ID): void {
 }
 
 export function moveEntry(songId: ID, entryId: ID, dir: -1 | 1): void {
-  recordArrangement(songId, 'MOVE SECTION');
   updateSong(songId, (d) => {
     const i = d.arrangement.findIndex((a) => a.id === entryId);
     const j = i + dir;

@@ -15,6 +15,7 @@ import { resetWordCache } from './engine/words';
 import { onCmuReady } from './engine/cmu';
 import { cmuTick, say } from './store/ui';
 import { setOnFreshPage } from './store/notebook';
+import { initFolder } from './store/vault';
 
 const ORDER: Record<Mode, number> = { roll: 0, table: 1, bench: 2 };
 const VIEWS: Record<Mode, () => preact.JSX.Element> = { roll: RollView, table: TableView, bench: BenchView };
@@ -48,7 +49,7 @@ function Desk() {
 
 export function App() {
   useEffect(() => {
-    void boot();
+    void boot().then(initFolder);
     setOnFreshPage(() => { if (mode.peek() === 'roll') say('A FRESH PAGE — THE LAST ONE IS A FLIP BACK'); });
     const idle = (window as any).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300));
     onCmuReady(() => { resetWordCache(); cmuTick.value++; });

@@ -56,16 +56,13 @@ describe('bench undo', () => {
     expect(undoDepth('bench')).toBe(depth - 1);
   });
 
-  it('moving a line past the end records nothing', () => {
+  it('moving a line is not an undo step', () => {
     const s = song(), sec = s.sections[0];
     const before = undoDepth('bench');
     moveLine(s.id, sec.id, activeTake(sec).lines[0].id, -1);
-    expect(undoDepth('bench')).toBe(before);
     moveLine(s.id, sec.id, activeTake(sec).lines[0].id, 1);
-    expect(undoDepth('bench')).toBe(before + 1);
     expect(lines()).toEqual(['b', 'a', 'c']);
-    runUndo('bench');
-    expect(lines()).toEqual(['a', 'b', 'c']);
+    expect(undoDepth('bench')).toBe(before);
   });
 
   it('the LCD UNDO belongs to its own action: it will not undo a later one', () => {

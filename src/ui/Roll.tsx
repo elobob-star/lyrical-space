@@ -1,6 +1,6 @@
 import { signal } from '@preact/signals';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { currentSong, drawScraps, scraps, setSetting, settings, updateCurrent } from '../store/state';
+import { currentSong, drawScraps, isFreshInstall, scraps, setSetting, settings, updateCurrent } from '../store/state';
 import { currentPage, flip, hasWords, pageId, pages, pendingMarks, punchPage, turnPage, updatePage } from '../store/notebook';
 import { Mark, Page, uid } from '../store/models';
 import { diffEdit, rebaseMarks } from '../engine/textdiff';
@@ -16,6 +16,8 @@ import { Key, Keys } from './Key';
 import { Icon } from './icons';
 import { Sheet } from './Sheet';
 import { setMode } from './Bezel';
+import { openCopy } from './Settings';
+import { chooseFolder, dismissPickup, folder, pickupOff } from '../store/vault';
 
 /** keep the soft keyboard up when a small button is tapped */
 const keepFocus = (e: Event) => e.preventDefault();
@@ -488,6 +490,7 @@ export function RollView() {
               onClick={() => { flipDir = 1; pen.value = false; feel('tape', 'medium'); const p2 = turnPage(); say(`NEW PAGE · P.${p2.n}`); setTimeout(() => (document.querySelector('.roll-input') as HTMLTextAreaElement | null)?.focus(), 80); }}><Icon n="plus" size={15} stroke={2} /></button>
           </header>
           {!isLatest && <div class="pg-older">AN EARLIER PAGE — STILL YOURS TO WRITE ON</div>}
+          <PickupSlip />
           {page.spark && (
             <div class="draw-slip" key={page.spark}>
               <span class="tape-bit" />
@@ -674,4 +677,25 @@ function layOnTable(ids: string[]): void {
 
 function scrollRollTop(): void {
   requestAnimationFrame(() => document.querySelector('.roll-scroll')?.scrollTo({ top: 0, behavior: 'smooth' }));
+}
+
+/** On a fresh install: a way back to everything written before (a folder, or a saved copy). */
+function PickupSlip() {
+  const f = folder.value;
+  const file = useRef<HTMLInputElement>(null);
+  if (pickupOff.value || f.linked || !isFreshInstall()) return null;
+  const canFolder = f.kind !== 'none';
+  return (
+    <div class="draw-slip pickup">
+      <span class="tape-bit" />
+      <div class="from">BEEN HERE BEFORE?</div>
+      <div class="txt">{canFolder ? 'Choose your Foolscap folder and every page, song and scrap comes back.' : 'Open a copy you saved and every page, song and scrap comes back.'}</div>
+      <div class="acts">
+        {canFolder && <button onClick={() => file.current?.click()}>A COPY…</button>}
+        <button class="go" onClick={() => { feel('click'); if (canFolder) void chooseFolder(); else file.current?.click(); }}>{canFolder ? 'CHOOSE FOLDER' : 'OPEN A COPY'}</button>
+        <button aria-label="Not now" onClick={dismissPickup}><Icon n="close" size={13} /></button>
+      </div>
+      <input ref={file} class="hidden-file" type="file" accept="application/json,.json" onChange={(e) => void openCopy(e.target as HTMLInputElement)} />
+    </div>
+  );
 }

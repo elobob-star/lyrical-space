@@ -70,15 +70,19 @@ ok('Enter makes a new line', withSplit === before.length + 1);
 await page.locator('.bench .undo-chip').click();
 await wait(200);
 ok('UNDO takes the new line back', (await page.locator('.card textarea.lin').count()) === before.length);
-// move a line down via its menu, then undo
+// moving a line is not an undo step: it moves back just as easily by hand
 const firstText = (await lineTexts())[0];
+const depth = () => page.evaluate(() => { const c = document.querySelector('.bench .undo-chip'); return c ? Number(c.querySelector('b')?.textContent || 1) : 0; });
+const d0 = await depth();
 await page.click('.gut >> nth=0');
 await page.locator('.sheet .choice:has-text("MOVE DOWN")').click();
 await wait(200);
 ok('a line moved down', (await lineTexts())[1] === firstText);
-await page.locator('.bench .undo-chip').click();
+ok('a move adds no UNDO step', (await depth()) === d0, `${d0} -> ${await depth()}`);
+await page.click('.gut >> nth=1');
+await page.locator('.sheet .choice:has-text("MOVE UP")').click();
 await wait(200);
-ok('UNDO puts it back', (await lineTexts())[0] === firstText);
+ok('and moves back by hand', (await lineTexts())[0] === firstText);
 // delete a line from its menu, then UNDO puts it back (once threw on a revoked immer draft)
 {
   const n0 = (await lineTexts()).length;

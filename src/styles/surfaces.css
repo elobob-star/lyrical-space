@@ -1,7 +1,10 @@
 /* =====================================================================
    MEDIA — paper, ink, wax and tape. Everything the writer types is set in one typewriter face.
    ===================================================================== */
-:root { --tape: rgba(232, 220, 181, .92); --tape-edge: rgba(150, 130, 80, .25); }
+:root { --tape: rgba(232, 220, 181, .92); --tape-edge: rgba(150, 130, 80, .25);
+  /* clear sticky tape for joining strips: you see the words through it, just a sheen and a hairline edge */
+  --clear-tape: linear-gradient(170deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, .16) 46%, rgba(255, 255, 255, .3));
+  --clear-edge: inset 0 0 0 .6px rgba(110, 100, 80, .32), 0 .5px 1px rgba(0, 0, 0, .06); }
 [data-paper='midnight'] { --tape: rgba(185, 170, 116, .9); }
 
 .tray-note { font: 500 10px/1.6 var(--font-ui); letter-spacing: .08em; color: var(--silk-2); padding: 6px 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; text-transform: uppercase; }
@@ -101,7 +104,7 @@
 .empty-table { position: absolute; left: 14%; right: 14%; top: 34%; text-align: center; color: rgba(240, 245, 238, .7); font: 500 12px/1.6 var(--font-ui); display: flex; flex-direction: column; gap: 8px; pointer-events: none; z-index: 1; }
 .empty-table b { letter-spacing: .3em; font-size: 10px; color: rgba(240, 245, 238, .9); }
 
-.strip { position: absolute; max-width: min(74%, calc((1 - var(--x, 0)) * 100% - 4px)); touch-action: none; user-select: none; cursor: grab; isolation: isolate; contain: layout style; }
+.strip { position: absolute; width: max-content; max-width: 74%; touch-action: none; user-select: none; cursor: grab; isolation: isolate; contain: layout style; }
 /* the shadow is a plain box underneath the paper, not a filter: filters on a clipped, moving layer are what made dragging feel heavy */
 .strip::before { content: ''; position: absolute; inset: 1px 1px 0; z-index: -2; border-radius: 1px; box-shadow: 0 1px 1px rgba(0, 0, 0, .3), 0 3px 6px rgba(0, 0, 0, .2); }
 .strip .shade { position: absolute; inset: 2px 3px 0; z-index: -1; border-radius: 2px; box-shadow: 0 16px 20px rgba(0, 0, 0, .34); opacity: 0; transition: opacity .14s; pointer-events: none; }
@@ -116,10 +119,10 @@
 .strip .sl { display: block; }
 .strip .gap { white-space: pre-wrap; }
 .strip .hseam { display: block; height: 1px; margin: 3px -13px; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, .2) 0 3px, transparent 3px 6px); position: relative; }
-.strip .hseam.taped::after, .strip .gap.joint::after { content: ''; position: absolute; background: var(--tape); box-shadow: 0 0 0 .5px var(--tape-edge); }
-.strip .hseam.taped::after { left: 10px; top: -7px; width: 30px; height: 14px; transform: rotate(-4deg); }
+.strip .hseam.taped::after, .strip .gap.joint::after { content: ''; position: absolute; background: var(--clear-tape); box-shadow: var(--clear-edge); border-radius: .5px; pointer-events: none; }
+.strip .hseam.taped::after { left: 12px; top: -5px; width: 19px; height: 10px; transform: rotate(-4deg); }
 .strip .gap.joint { position: relative; }
-.strip .gap.joint::after { left: 50%; top: -4px; bottom: -4px; width: 12px; margin-left: -6px; transform: rotate(3deg); }
+.strip .gap.joint::after { left: 50%; top: -1px; bottom: -1px; width: 9px; margin-left: -4.5px; transform: rotate(3deg); }
 .strip.dragging { z-index: 999 !important; cursor: grabbing; will-change: transform; }
 .strip.dragging .shade { opacity: 1; }
 .strip.landing { animation: dealin .5s var(--spring-soft) backwards; }
@@ -127,14 +130,13 @@
 /* picked up: a clean accent edge, no re-render, nothing written to the song */
 .strip.sel { z-index: 900 !important; }
 .strip.sel::before { box-shadow: 0 0 0 2px var(--accent), 0 4px 10px rgba(0, 0, 0, .3); }
-/* scissors: every possible cut shows as a faint perforation; the one you are aiming at lights up */
-.cutting .strip { cursor: crosshair; }
-.cutting .strip .gap { position: relative; }
-.cutting .strip .gap::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 0; border-left: 1.5px dashed rgba(229, 55, 42, .55); }
-.cutting .strip .hseam { background: repeating-linear-gradient(90deg, rgba(229, 55, 42, .7) 0 4px, transparent 4px 7px); height: 1.5px; }
+/* scissors out (a picked-up strip): every place it can be cut shows as a dashed line; the one you are aiming at lights up */
+.strip.sel { cursor: crosshair; }
+.strip.sel .gap { position: relative; }
+.strip.sel .gap::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 0; border-left: 1.5px dashed rgba(229, 55, 42, .6); animation: fadein .16s; }
+.strip.sel .hseam { background: repeating-linear-gradient(90deg, rgba(229, 55, 42, .7) 0 4px, transparent 4px 7px); height: 1.5px; }
 .strip.aiming { transform-origin: 50% 50%; }
 .strip.aiming::before { box-shadow: 0 0 0 2px var(--accent), 0 6px 14px rgba(0, 0, 0, .35); }
-.board.cutting { box-shadow: inset 0 0 0 2px var(--accent); }
 .cutguide { position: absolute; left: 0; top: 0; z-index: 1100; pointer-events: none; will-change: transform; transition: transform .07s linear; }
 .cutguide[data-kind='gap'] { border-left: 2px dashed var(--accent); }
 .cutguide[data-kind='seam'] { border-top: 2px dashed var(--accent); }
@@ -142,19 +144,20 @@
 .cutguide[data-kind='gap'] i { left: -12px; top: -22px; }
 .cutguide[data-kind='seam'] i { left: -22px; top: -12px; }
 .slash { position: absolute; left: 0; top: 0; z-index: 1100; height: 3px; margin-top: -1.5px; border-radius: 2px; pointer-events: none; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 40%, #fff); box-shadow: 0 0 10px 2px rgba(255, 79, 0, .7); }
-.cut-banner { position: absolute; left: 50%; bottom: 14px; z-index: 1050; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; background: var(--accent); color: #fff; font: 700 9px var(--font-ui); letter-spacing: .14em; white-space: nowrap; box-shadow: 0 3px 10px rgba(0, 0, 0, .3); pointer-events: none; animation: fadein .15s; }
-/* a strip offered a piece of tape */
-.strip.tape-stack::after, .strip.tape-join::after { content: ''; position: absolute; background: var(--tape); box-shadow: 0 0 0 .5px var(--tape-edge); animation: fadein .12s; }
-.strip.tape-stack::after { left: 18%; bottom: -10px; width: 46px; height: 18px; transform: rotate(-3deg); }
-.strip.tape-join::after { right: -12px; top: 50%; width: 22px; height: 30px; margin-top: -15px; transform: rotate(4deg); }
+/* a strip offered a piece of tape, on whichever edge the other one is touching */
+.strip.tape-stack::after, .strip.tape-join::after, .strip.tape-above::after, .strip.tape-before::after { content: ''; position: absolute; z-index: 2; background: var(--clear-tape); box-shadow: var(--clear-edge), 0 0 0 1.5px rgba(255, 79, 0, .55); border-radius: .5px; animation: fadein .12s; pointer-events: none; }
+.strip.tape-stack::after { left: 18%; bottom: -6px; width: 22px; height: 11px; transform: rotate(-3deg); }
+.strip.tape-above::after { left: 18%; top: -6px; width: 22px; height: 11px; transform: rotate(3deg); }
+.strip.tape-join::after { right: -6px; top: 50%; width: 11px; height: 22px; margin-top: -11px; transform: rotate(4deg); }
+.strip.tape-before::after { left: -6px; top: 50%; width: 11px; height: 22px; margin-top: -11px; transform: rotate(-4deg); }
 .strip-actions { position: absolute; display: flex; gap: 3px; padding: 3px; background: var(--panel); border-radius: 8px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .12), 0 6px 14px rgba(0, 0, 0, .3); animation: fadein .12s; max-width: calc(100% - 8px); }
 .strip-actions button { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 34px; height: 34px; padding: 0 8px; font: 700 9px var(--font-ui); letter-spacing: .1em; color: var(--cap-ink); border-radius: 5px; background: var(--cap); box-shadow: 0 1.5px 0 var(--cap-edge); }
 .strip-actions button.go { background: var(--accent); color: #fff; box-shadow: 0 1.5px 0 #b23700; }
 .strip-actions button.danger { color: var(--red); }
-.undo-chip { position: absolute; top: 12px; right: 10px; z-index: 1050; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px 1px 9px; border-radius: 999px; font: 700 9px var(--font-ui); letter-spacing: .14em; color: var(--cap-ink); background: linear-gradient(180deg, var(--cap-hi), var(--cap) 30%); box-shadow: 0 2px 0 var(--cap-edge), 0 4px 10px rgba(0, 0, 0, .22); animation: chipin .3s var(--spring-soft); }
-.undo-chip .ic { color: var(--accent); }
-.undo-chip b { min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: var(--accent); color: #fff; font: 700 9px/15px var(--font-ui); text-align: center; letter-spacing: 0; }
-.undo-chip:active { transform: translate3d(0, 2px, 0); }
+/* undo on the paper itself: a small inked arrow, the same as the notebook's, only there when there is something to take back */
+.undo-chip { position: relative; flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--accent); animation: chipin .25s var(--spring-soft); }
+.undo-chip:active { background: rgba(255, 79, 0, .12); }
+.undo-chip b { position: absolute; right: 0; top: 2px; font: 700 8px/1 var(--font-ui); color: var(--accent); }
 @keyframes chipin { from { transform: scale(.7); opacity: 0; } }
 
 /* =====================================================================
@@ -501,4 +504,5 @@
 .pg-undo:active { background: rgba(255, 79, 0, .12); }
 .bench-title-row { display: flex; align-items: center; gap: 8px; margin: 10px 9px 0; }
 .bench-title-row .bench-title { width: auto; flex: 1; min-width: 0; margin: 0; }
-.bench .undo-chip { position: static; flex: none; height: 28px; animation: chipin .3s var(--spring-soft); }
+
+.draw-slip.pickup .txt { font: 400 14px/1.45 var(--font-type); }

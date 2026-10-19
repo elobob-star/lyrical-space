@@ -2,11 +2,12 @@ import { computed, effect, signal } from '@preact/signals';
 import { produce, setAutoFreeze } from 'immer';
 import { dbAll, dbDelete, dbGet, dbPut, kvGet, kvSet, persistRequest } from './db';
 import {
-  DEFAULT_SETTINGS, ID, Scrap, ScrapFrom, Settings, Song, newSong, normalizeScrap, uid,
+  DEFAULT_SETTINGS, ID, Page, Scrap, ScrapFrom, Settings, Song, newSong, normalizeScrap, uid,
 } from './models';
 import { seedScraps, seedSong } from './seed';
 import { dropHistory, forceSnapshot, maybeSnapshot } from './history';
-import { flushPages, loadNotebook, mergePages, pages } from './notebook';
+import { flushPages, loadNotebook, mergePages, pages, upsertPages } from './notebook';
+import { version } from '../../package.json';
 
 setAutoFreeze(false);
 
@@ -137,6 +138,19 @@ const timers = new Map<ID, ReturnType<typeof setTimeout>>();
 let scrapTimer: ReturnType<typeof setTimeout> | undefined;
 let booted = false;
 
+/** What a fresh install starts with (the sample tape, the welcome page, the sample scraps) — so it can make way for real work. */
+interface SeedMark { at: number; songs: Record<ID, number>; scraps: ID[]; pages: Record<ID, string> }
+let seedMark: SeedMark | null = null;
+
+/** Nothing here yet but what the app came with, untouched: picking up a folder or a copy may simply replace it. */
+export function isFreshInstall(): boolean {
+  const m = seedMark;
+  if (!m) return false;
+  return songs.value.every((s) => m.songs[s.id] === s.updatedAt)
+    && scraps.value.every((s) => m.scraps.includes(s.id))
+    && pages.value.every((p) => (!/\S/.test(p.text) && !p.spark) || m.pages[p.id] === p.text);
+}
+
 function flushSong(s: Song): void {
   const prev = savedRefs.get(s.id);
   if (prev && prev !== s) void maybeSnapshot(prev);
@@ -190,8 +204,16 @@ export async function boot(): Promise<void> {
   if (!currentId.value) createSong();
   // the app always opens on the notebook
   mode.value = 'roll';
-  await loadNotebook(loaded, !onboarded && !dbSongs.length && !dbScraps.length);
+  const fresh = !onboarded && !dbSongs.length && !dbScraps.length;
+  await loadNotebook(loaded, fresh);
   if (loaded.length && !onboarded) void kvSet('seeded', true);
+  if (fresh) {
+    seedMark = {
+      at: Date.now(), songs: Object.fromEntries(loaded.map((s) => [s.id, s.updatedAt])),
+      scraps: loadedScraps.map((s) => s.id), pages: Object.fromEntries(pages.peek().map((p) => [p.id, p.text])),
+    };
+    void kvSet('seed', seedMark);
+  } else seedMark = (await kvGet<SeedMark>('seed')) ?? null;
   void persistRequest();
   ready.value = true;
 
@@ -230,32 +252,88 @@ const blobToDataUrl = (b: Blob) => new Promise<string>((res, rej) => {
   r.readAsDataURL(b);
 });
 
+/**
+ * Everything, as one plain object: the format of the folder's foolscap-library.json and of a saved copy
+ * (documented in docs/FORMAT.md — anything that reads it can pick up where this app left off).
+ */
+export function libraryData(): { app: 'portascribe'; format: 'foolscap-library'; schema: number; version: number; appVersion: string; savedAt: string; songs: Song[]; scraps: Scrap[]; pages: Page[]; settings: Settings } {
+  // the file marker stays 'portascribe' so copies move freely between this app and the earlier MK-I build
+  return {
+    app: 'portascribe', format: 'foolscap-library', schema: 4, version: 3, appVersion: version, savedAt: new Date().toISOString(),
+    songs: songs.peek(), scraps: scraps.peek(), pages: pages.peek(), settings: settings.peek(),
+  };
+}
+
 /** Whole library as one JSON file — including voice memos (base64). */
 export async function backupAll(): Promise<string> {
-  const live = songs.value.filter((s) => !s.deletedAt);
+  const data = libraryData();
   const blobs: Record<string, string> = {};
-  for (const s of live) for (const m of s.memos) {
+  for (const s of data.songs) for (const m of s.memos) {
     const b = await dbGet<Blob>('blobs', m.id);
     if (b) blobs[m.id] = await blobToDataUrl(b);
   }
-  return JSON.stringify({ app: 'portascribe', version: 3, exportedAt: new Date().toISOString(), songs: live, scraps: scraps.value, pages: pages.value, blobs });
+  return JSON.stringify({ ...data, exportedAt: data.savedAt, blobs });
+}
+
+export const isLibrary = (data: any): boolean => !!data && (data.app === 'portascribe' || data.format === 'foolscap-library') && Array.isArray(data.songs);
+
+/**
+ * Pick up a library (from the folder, after a reinstall or from another app that shares it). Everything is matched by
+ * id and the newer version of each song and page wins, so picking up the same folder twice never doubles anything.
+ * On a fresh install the sample tape and welcome page simply make way.
+ */
+export function pickUpLibrary(data: any, replace: boolean): { songs: number; scraps: number; pages: number } {
+  const inSongs: Song[] = Array.isArray(data?.songs) ? data.songs : [];
+  const inScraps: Scrap[] = (Array.isArray(data?.scraps) ? data.scraps : []).map(normalizeScrap);
+  const inPages: Page[] = Array.isArray(data?.pages) ? data.pages : [];
+  const n = { songs: 0, scraps: 0, pages: 0 };
+  if (replace) {
+    for (const s of songs.peek()) if (!inSongs.some((x) => x.id === s.id)) { savedRefs.delete(s.id); void dbDelete('songs', s.id); void dropHistory(s.id); }
+    for (const s of scraps.peek()) if (!inScraps.some((x) => x.id === s.id)) { savedScraps.delete(s.id); void dbDelete('scraps', s.id); }
+  }
+  const list = replace ? [] : [...songs.peek()];
+  for (const s of inSongs) {
+    const i = list.findIndex((x) => x.id === s.id);
+    if (i < 0) { list.push(s); n.songs++; } else if ((s.updatedAt ?? 0) > list[i].updatedAt) { list[i] = s; n.songs++; }
+  }
+  list.sort((a, b) => b.updatedAt - a.updatedAt);
+  songs.value = list;
+  const sc = replace ? [] : [...scraps.peek()];
+  for (const s of inScraps) if (!sc.some((x) => x.id === s.id)) { sc.push(s); n.scraps++; }
+  scraps.value = sc.sort((a, b) => b.createdAt - a.createdAt);
+  n.pages = upsertPages(inPages, replace);
+  if (replace && data?.settings) settings.value = { ...DEFAULT_SETTINGS, ...data.settings };
+  const live = list.filter((s) => !s.deletedAt);
+  if (replace || !live.some((s) => s.id === currentId.peek())) currentId.value = live[0]?.id ?? null;
+  if (!currentId.value) createSong();
+  if (replace) { seedMark = null; void kvSet('seed', null); }
+  return n;
 }
 
 /** Merge a backup into the library. */
 export async function importBackup(json: string): Promise<{ songs: number; scraps: number; pages: number }> {
   const data = JSON.parse(json);
-  // the file marker stays 'portascribe' so backups move freely between this app and the earlier MK-I build
-  if (data?.app !== 'portascribe') throw new Error('Not a Foolscap backup');
+  if (!isLibrary(data)) throw new Error('Not a Foolscap backup');
+  const blobs0: Record<string, string> = data.blobs ?? {};
+  // on a fresh install a saved copy simply becomes the library
+  if (isFreshInstall()) {
+    for (const [id, url] of Object.entries(blobs0)) {
+      try { await dbPut('blobs', id, await (await fetch(url)).blob()); } catch { /* skip a bad memo */ }
+    }
+    return pickUpLibrary(data, true);
+  }
   const inSongs: Song[] = data.songs ?? [];
   const inScraps: Scrap[] = (data.scraps ?? []).map(normalizeScrap);
   const blobs: Record<string, string> = data.blobs ?? {};
   for (const [id, url] of Object.entries(blobs)) {
     try { await dbPut('blobs', id, await (await fetch(url)).blob()); } catch { /* skip a bad memo */ }
   }
-  const known = new Set(songs.value.map((s) => s.id));
+  const known = new Map(songs.value.map((s) => [s.id, s]));
   const merged = [...songs.value];
   for (const s of inSongs) {
-    if (known.has(s.id)) s.id = uid();
+    const have = known.get(s.id);
+    if (have && have.updatedAt === s.updatedAt) continue; // that very version is already here
+    if (have) s.id = uid(); // a different version of a song you have: it comes in alongside, as its own tape
     merged.push(s);
   }
   songs.value = merged;

@@ -1,10 +1,11 @@
 import { useRef } from 'preact/hooks';
-import { backupAll, importBackup, liveSongs, scraps, setSetting, settings } from '../store/state';
+import { importBackup, liveSongs, scraps, setSetting, settings } from '../store/state';
 import { pages } from '../store/notebook';
 import { Chassis, Paper } from '../store/models';
 import { layer, say } from '../store/ui';
-import { shareFile } from '../engine/share';
+import { chooseFolder, folder, forgetFolder, reconnectFolder, saveCopy } from '../store/vault';
 import { feel } from '../engine/feel';
+import { ago } from './Rack';
 import { version } from '../../package.json';
 import { Sheet } from './Sheet';
 import { SwitchRow } from './Switch';
@@ -15,6 +16,53 @@ const PAPERS: Array<{ id: Paper; name: string }> = [
 ];
 const SIZES = [{ n: 0, name: 'SMALL', px: 13 }, { n: 1, name: 'MEDIUM', px: 16 }, { n: 2, name: 'LARGE', px: 19.5 }];
 
+/** Read a saved copy the user picked and bring it in. */
+export async function openCopy(input: HTMLInputElement): Promise<void> {
+  const f = input.files?.[0];
+  if (!f) return;
+  try {
+    const r = await importBackup(await f.text());
+    say(`OPENED THE COPY — ${r.pages} PAGES · ${r.songs} TAPES · ${r.scraps} SCRAPS`, undefined, 5000);
+  } catch { say('THAT FILE IS NOT A FOOLSCAP COPY'); }
+  input.value = '';
+}
+
+/** Where the work is kept, besides this app. */
+function FolderBox() {
+  const f = folder.value;
+  if (f.kind === 'none') {
+    return (
+      <div class="folder-box">
+        <b>THIS APP ONLY</b>
+        <small>Everything is saved on this phone, inside the app. This browser can't keep a folder up to date, so save a copy now and then — it survives deleting the app.</small>
+      </div>
+    );
+  }
+  if (!f.linked) {
+    return (
+      <div class="folder-box">
+        <b>KEEP IT IN A FOLDER</b>
+        <small>Choose a folder (Documents is a good place) and everything you write is kept there too, as plain files. Delete the app, install it again — or a whole new version — choose the same folder, and it all comes back.</small>
+        <button class="btn go" onClick={() => { feel('click'); void chooseFolder(); }}>CHOOSE A FOLDER…</button>
+      </div>
+    );
+  }
+  return (
+    <div class={'folder-box linked' + (f.reconnect || f.err ? ' warn' : '')}>
+      <b><i class={'led' + (f.reconnect || f.err ? ' red on' : ' green on')} /> {(f.name || 'FOLDER').toUpperCase()}</b>
+      <small>{f.reconnect ? 'The folder needs to be allowed again before anything more can be kept there.'
+        : f.err ? f.err.toLowerCase() + ' — it will try again with the next change.'
+        : f.at ? `Everything is kept here too — last written ${ago(f.at).toLowerCase()}.` : 'Everything is kept here too.'}</small>
+      <div class="row">
+        {f.reconnect
+          ? <button class="btn go grow" onClick={() => void reconnectFolder()}>ALLOW AGAIN</button>
+          : <button class="btn grow" onClick={() => void chooseFolder()}>CHANGE…</button>}
+        <button class="btn grow" onClick={() => { void forgetFolder(); say('STOPPED KEEPING A FOLDER — THE FILES THERE STAY'); }}>STOP</button>
+      </div>
+    </div>
+  );
+}
+
 export function Settings() {
   const st = settings.value;
   const close = () => { layer.value = null; };
@@ -22,6 +70,24 @@ export function Settings() {
   const tog = <K extends 'ghost' | 'gutter' | 'online' | 'awake' | 'leftHand' | 'haptics' | 'clicks' | 'keys' | 'grain'>(k: K) => (v: boolean) => setSetting(k, v as any);
   return (
     <Sheet title="SETUP" right={<span class="ver">FOOLSCAP v{version}</span>} onClose={close}>
+      <section class="set-card">
+        <h4>LIBRARY</h4>
+        <div class="stats">
+          <div><b>{liveSongs.value.length}</b><small>TAPES</small></div>
+          <div><b>{pages.value.length}</b><small>PAGES</small></div>
+          <div><b>{scraps.value.length}</b><small>SCRAPS</small></div>
+        </div>
+        <FolderBox />
+        <div class="row">
+          <button class="btn grow" onClick={() => void saveCopy()}>SAVE A COPY</button>
+          <button class="btn grow" onClick={() => file.current?.click()}>OPEN A COPY…</button>
+        </div>
+        <input ref={file} class="hidden-file" type="file" accept="application/json,.json" onChange={(e) => void openCopy(e.target as HTMLInputElement)} />
+        <p class="hint small">
+          {folder.value.lastCopy ? `Last copy saved ${ago(folder.value.lastCopy).toLowerCase()}. ` : ''}
+          A copy is one file with everything in it, voice memos too — keep it in Files, iCloud or Drive, or send it to another phone. It also opens in the earlier Portascribe MK-I.
+        </p>
+      </section>
       <section class="set-card">
         <h4>LOOK</h4>
         <div class="set-label">FINISH</div>
@@ -67,32 +133,6 @@ export function Settings() {
         <SwitchRow label="TYPEWRITER KEYS" hint="a tick per keystroke in the notebook, and the bell on return" on={st.keys} onChange={tog('keys')} />
       </section>
 
-      <section class="set-card">
-        <h4>LIBRARY</h4>
-        <div class="stats">
-          <div><b>{liveSongs.value.length}</b><small>TAPES</small></div>
-          <div><b>{pages.value.length}</b><small>PAGES</small></div>
-          <div><b>{scraps.value.length}</b><small>SCRAPS</small></div>
-        </div>
-        <div class="row">
-          <button class="btn grow" onClick={async () => {
-            say('PACKING THE BACKUP…');
-            const json = await backupAll();
-            void shareFile(`foolscap-backup-${new Date().toISOString().slice(0, 10)}.json`, new Blob([json], { type: 'application/json' }), 'Foolscap backup');
-          }}>BACKUP ALL</button>
-          <button class="btn grow" onClick={() => file.current?.click()}>RESTORE…</button>
-        </div>
-        <input ref={file} class="hidden-file" type="file" accept="application/json,.json" onChange={async (e) => {
-          const f = (e.target as HTMLInputElement).files?.[0];
-          if (!f) return;
-          try {
-            const r = await importBackup(await f.text());
-            say(`RESTORED ${r.songs} TAPES, ${r.scraps} SCRAPS, ${r.pages} PAGES`);
-          } catch { say('THAT FILE IS NOT A FOOLSCAP BACKUP'); }
-          (e.target as HTMLInputElement).value = '';
-        }} />
-        <p class="hint small">Stored on this device only. Backups include voice memos, and also open in the earlier Portascribe MK-I.</p>
-      </section>
 
       <p class="credits">
         Pronunciations: CMU Pronouncing Dictionary · Frequencies: SUBTLEX-US · Related words: Datamuse · Definitions: Free Dictionary API · Type: Space Grotesk, Courier Prime, Doto (SIL OFL).
