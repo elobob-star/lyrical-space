@@ -1,10 +1,9 @@
 name: Publish the web app
 
-# The same app as a web page. On an iPhone: open the link in Safari → Share → Add to Home Screen, and it installs
-# like an app and works offline. Needs Settings → Pages → Source: "GitHub Actions" (once).
+# The same app as a web page on GitHub Pages — only useful if the repository is PUBLIC (Pages is not free for private
+# repos). For a private repo use Netlify / Cloudflare Pages instead (netlify.toml is ready; see docs/IOS.md).
+# Run it by hand: Actions → "Publish the web app" → Run workflow. Needs Settings → Pages → Source: "GitHub Actions" once.
 on:
-  push:
-    branches: [ccr-a81f4d95-ma4yu1]
   workflow_dispatch:
 
 permissions:

@@ -13,16 +13,35 @@ Nothing here needs a Mac of your own except the optional "build it yourself" rou
 
 ---
 
-## A. The web app (works today)
+## A. The web app (free, works today — and your friends can use it too)
 
-1. In the GitHub repository open **Settings → Pages** and set **Source: GitHub Actions** (once).
-   Pushing to the main branch then publishes the app (`.github/workflows/pages.yml`); the link appears under *Settings → Pages* and in the workflow run.
-   *(Free GitHub accounts can only publish Pages from public repositories.)*
-2. On the iPhone open that link in **Safari** → **Share** → **Add to Home Screen**.
-3. Open it once while online and wait a few seconds: the dictionary is cached and from then on it works with no network.
+The web app is the same code in a browser tab that installs like an app. One link works for **iPhone and Android**, so
+a friend only needs the link — nothing to download from an app store.
 
-What differs from the native app: no haptic buzz, sounds start after the first tap and follow the silent switch, "keep screen on" needs iOS 16.4+.
-Storage is separate from Safari's own tabs, and from the native app — use **Setup → BACKUP ALL** before deleting the icon. The backup file opens in every Foolscap (and the old Portascribe MK-I).
+**Put it online once (about 3 minutes, free).** The repository is private, and GitHub Pages is not free for private
+repositories, so use a host that is:
+
+1. Sign up at **netlify.com** (free; "Sign up with GitHub" is easiest).
+2. **Add new site → Import an existing project → GitHub →** pick `lyrical-space`, and choose the **main** branch.
+   The settings come from `netlify.toml` (build `npm run build`, publish `dist`) — just press **Deploy**.
+3. After a minute you get a link like `https://something.netlify.app`. Every merge to main updates it by itself.
+   *(In Site configuration → Change site name you can make it `foolscap-yourname.netlify.app`.)*
+
+*(Alternatives with the same two settings: Cloudflare Pages or Vercel. Or make the repository public and run the
+"Publish the web app" workflow for GitHub Pages — but that puts the code in public view.)*
+
+**Install it (each person, on their own phone):**
+* **iPhone:** open the link in **Safari** → **Share** → **Add to Home Screen**.
+* **Android:** open it in Chrome → ⋮ → **Install app** (or Add to Home screen).
+
+Open it once while online and wait a few seconds: the dictionary is cached and from then on it works with no network.
+
+**Good to know**
+* Everyone's writing lives **only on their own phone** — a friend gets their own empty notebook, you never see theirs and they never see yours.
+  There is no account and no sync.
+* No haptic buzz on iPhone web apps (Safari has no vibration API); sounds start after the first tap and follow the silent switch; "keep screen on" needs iOS 16.4+.
+* Storage is separate from Safari's own tabs and from the native app — use **Setup → BACKUP ALL** before deleting the icon.
+  The backup file opens in every Foolscap (and the old Portascribe MK-I), so it also moves your notebook to a new phone.
 
 ## B. The real app, sideloaded for free
 

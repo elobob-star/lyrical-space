@@ -1,0 +1,11 @@
+# Netlify / Cloudflare Pages: the page and the service worker are always re-checked (so an update arrives),
+# the hashed build files never change and are cached for a year.
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

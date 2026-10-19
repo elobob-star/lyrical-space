@@ -47,7 +47,7 @@ Regenerate icons: edit `assets/*.svg`, then `npm run icons && npx capacitor-asse
 
 ## iPhone
 
-Foolscap also runs on iPhone — as an installable **web app** (free, no Mac: Safari → Share → Add to Home Screen), as a
+Foolscap also runs on iPhone — as an installable **web app** (free, no Mac, one link for friends on any phone: Safari → Share → Add to Home Screen; hosting setup is 3 minutes on Netlify's free plan, `netlify.toml` is ready), as a
 **sideloaded native app**, or through **TestFlight**. The `ios/` project is built on a Mac runner by
 `.github/workflows/ios.yml`. Step by step, costs and caveats: [`docs/IOS.md`](docs/IOS.md).
 
