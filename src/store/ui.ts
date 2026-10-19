@@ -59,6 +59,9 @@ export const layer = signal<Layer>(null);
 export const slipOpen = signal(false);
 export const rackTab = signal<'tapes' | 'shoebox' | 'bin'>('tapes');
 
+/** the scissors are in your hand on the Table: press a strip, slide to the cut, let go */
+export const cutting = signal(false);
+
 // ---------- bench ----------
 export type Tray = null | 'chords' | 'shoebox' | 'words';
 export const tray = signal<Tray>(null);

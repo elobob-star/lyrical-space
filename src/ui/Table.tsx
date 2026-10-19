@@ -6,7 +6,7 @@ import { ID, SectionKind, Strip, sectionNames, uid } from '../store/models';
 import { feel, haptic, sound } from '../engine/feel';
 import { freeSpot, makeStrips, sendTextToBench } from '../store/actions';
 import { cutUp, piecesOf, snip, tape, TapeHow } from '../store/strips';
-import { hintOnce, say } from '../store/ui';
+import { cutting, hintOnce, say } from '../store/ui';
 import { pushUndo, undoable } from '../store/undo';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
@@ -15,9 +15,7 @@ import { UndoChip } from './UndoChip';
 import { setMode } from './Bezel';
 
 const selected = signal<ID | null>(null);
-/** the scissors are in your hand: press a strip, slide to the cut, let go */
-export const cutting = signal(false);
-const sheetState = signal<null | { kind: 'new'; x: number; y: number } | { kind: 'edit'; id: ID } | { kind: 'bench'; id: ID }>(null);
+const sheetState = signal<null | { kind: 'new'; x: number; y: number } | { kind: 'edit'; id: ID } | { kind: 'bench'; id: ID } | { kind: 'more'; id: ID }>(null);
 /** stagger for strips that just landed (deal / cut-up) */
 const arrival = new Map<ID, number>();
 
@@ -454,14 +452,13 @@ export function TableView() {
 
   const strips = [...song.table].sort((a, b) => a.z - b.z);
   const selStrip = strips.find((s) => s.id === sel);
-  const multi = !!selStrip && selStrip.text.includes('\n');
   // the action bar sits over its strip, nudged left so it never runs off the mat
   const bar = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = bar.current, b = board.current;
     if (!el || !b || !selStrip) return;
     el.style.left = `${Math.max(4, Math.min(selStrip.x * b.clientWidth, b.clientWidth - el.offsetWidth - 4))}px`;
-  }, [sel, selStrip?.x, multi]);
+  }, [sel, selStrip?.x]);
 
   return (
     <div class={'mode-view table' + (cut ? ' cutting' : '')}>
@@ -487,41 +484,7 @@ export function TableView() {
             <button onClick={() => { sheetState.value = { kind: 'edit', id: selStrip.id }; }}><Icon n="edit" size={14} />EDIT</button>
             <button onClick={() => { selected.value = null; cutting.value = true; feel('snip', 'light'); say('SCISSORS — PRESS A STRIP, SLIDE TO THE CUT, LET GO'); }}><Icon n="scissors" size={14} />SNIP</button>
             <button class="go" onClick={() => { sheetState.value = { kind: 'bench', id: selStrip.id }; }}><Icon n="bench" size={14} />BENCH</button>
-            <button aria-label="Duplicate" onClick={() => {
-              const before = snapshot();
-              updateCurrent((d) => { const t = d.table.find((x) => x.id === selStrip.id); if (t) d.table.push({ ...JSON.parse(JSON.stringify(t)), id: uid(), x: clampX(t.x + 0.05), y: clampY(t.y + 0.06), z: topZ(d.table) }); });
-              feel('thock'); undoable('table', 'COPIED', () => restore(before));
-            }}><Icon n="copy" size={14} /></button>
-            {multi && <button aria-label="Split into lines" onClick={() => {
-              const before = snapshot();
-              updateCurrent((d) => {
-                const t = d.table.find((x) => x.id === selStrip.id);
-                if (!t) return;
-                let cur: { text: string; joints: number[] } = { text: t.text, joints: t.joints ?? [] };
-                const pieces: Array<{ text: string; joints: number[] }> = [];
-                for (let guard = 0; guard < 40; guard++) {
-                  const i = cur.text.indexOf('\n');
-                  if (i < 0) break;
-                  const parts = snip(cur, i);
-                  if (!parts) break;
-                  pieces.push(parts[0]); cur = parts[1];
-                }
-                pieces.push(cur);
-                t.text = pieces[0].text; t.joints = pieces[0].joints;
-                let z = topZ(d.table);
-                pieces.slice(1).forEach((p, k) => d.table.push({ id: uid(), text: p.text, joints: p.joints, from: 'cut', x: clampX(t.x + 0.02 * (k + 1)), y: clampY(t.y + 0.085 * (k + 1)), rot: t.rot + (Math.random() - 0.5) * 2, z: z++ }));
-              });
-              selected.value = null; feel('snip', 'medium');
-              undoable('table', 'SPLIT INTO LINES', () => restore(before));
-            }}><Icon n="strip" size={14} /></button>}
-            <button aria-label="Keep in the shoebox" onClick={() => {
-              const before = snapshot();
-              const sc = addScrap(selStrip.text.replace(/\n/g, ' / '), 'table', song.id);
-              updateCurrent((d) => { d.table = d.table.filter((x) => x.id !== selStrip.id); });
-              selected.value = null;
-              feel('thock');
-              undoable('table', 'FILED IN THE SHOEBOX', () => { restore(before); if (sc) removeScrap(sc.id); });
-            }}><Icon n="box" size={14} /></button>
+            <button aria-label="More" onClick={() => { sheetState.value = { kind: 'more', id: selStrip.id }; }}><Icon n="dots" size={16} /></button>
             <button class="danger" aria-label="Throw away" onClick={() => {
               const before = snapshot();
               updateCurrent((d) => { d.table = d.table.filter((x) => x.id !== selStrip.id); });
@@ -559,7 +522,75 @@ export function TableView() {
           }} />
       )}
       {sheet?.kind === 'bench' && <BenchChooser id={sheet.id} />}
+      {sheet?.kind === 'more' && <MoreSheet id={sheet.id} />}
     </div>
+  );
+}
+
+
+/** The less common things you can do with one strip. */
+function MoreSheet({ id }: { id: ID }) {
+  const song = currentSong.value!;
+  const strip = song.table.find((s) => s.id === id);
+  const close = () => (sheetState.value = null);
+  if (!strip) return null;
+  const multi = strip.text.includes('\n');
+  const words = strip.text.split(/\s+/).filter(Boolean);
+  const done = (label: string, before: Strip[], extra?: () => void) => { selected.value = null; close(); undoable('table', label, () => { restore(before); extra?.(); }); };
+  return (
+    <Sheet title="THIS STRIP" onClose={close}>
+      <div class="choices">
+        <button class="choice" onClick={() => {
+          const before = snapshot();
+          updateCurrent((d) => { const t = d.table.find((x) => x.id === id); if (t) d.table.push({ ...JSON.parse(JSON.stringify(t)), id: uid(), x: clampX(t.x + 0.05), y: clampY(t.y + 0.06), z: topZ(d.table) }); });
+          feel('thock'); done('COPIED', before);
+        }}><span>DUPLICATE</span><small>a second copy beside it</small></button>
+        <button class="choice" disabled={words.length < 2} onClick={() => {
+          const before = snapshot();
+          updateCurrent((d) => {
+            const t = d.table.find((x) => x.id === id);
+            if (!t) return;
+            const out: Strip[] = d.table.filter((x) => x.id !== id);
+            let z = topZ(d.table);
+            const fresh: Strip[] = [];
+            words.forEach((w, k) => {
+              const p = k === 0 ? { x: t.x, y: t.y } : freeSpot([...out, ...fresh]);
+              fresh.push({ id: uid(), text: w, from: 'cut', x: p.x, y: p.y, rot: (Math.random() - 0.5) * 8, z: z++ });
+            });
+            land(fresh);
+            d.table = [...out, ...fresh];
+          });
+          feel('snip', 'medium'); done('SPLIT INTO WORDS', before);
+        }}><span>SPLIT INTO WORDS</span><small>every word its own slip</small></button>
+        <button class="choice" disabled={!multi} onClick={() => {
+          const before = snapshot();
+          updateCurrent((d) => {
+            const t = d.table.find((x) => x.id === id);
+            if (!t) return;
+            let cur: { text: string; joints: number[] } = { text: t.text, joints: t.joints ?? [] };
+            const pieces: Array<{ text: string; joints: number[] }> = [];
+            for (let guard = 0; guard < 40; guard++) {
+              const i = cur.text.indexOf('\n');
+              if (i < 0) break;
+              const parts = snip(cur, i);
+              if (!parts) break;
+              pieces.push(parts[0]); cur = parts[1];
+            }
+            pieces.push(cur);
+            t.text = pieces[0].text; t.joints = pieces[0].joints;
+            let z = topZ(d.table);
+            pieces.slice(1).forEach((p, k) => d.table.push({ id: uid(), text: p.text, joints: p.joints, from: 'cut', x: clampX(t.x + 0.02 * (k + 1)), y: clampY(t.y + 0.085 * (k + 1)), rot: t.rot + (Math.random() - 0.5) * 2, z: z++ }));
+          });
+          feel('snip', 'medium'); done('SPLIT INTO LINES', before);
+        }}><span>SPLIT INTO LINES</span><small>each line on its own strip</small></button>
+        <button class="choice" onClick={() => {
+          const before = snapshot();
+          const sc = addScrap(strip.text.replace(/\n/g, ' / '), 'table', song.id);
+          updateCurrent((d) => { d.table = d.table.filter((x) => x.id !== id); });
+          feel('thock'); done('FILED IN THE SHOEBOX', before, () => { if (sc) removeScrap(sc.id); });
+        }}><span>KEEP IN THE SHOEBOX</span><small>for another day</small></button>
+      </div>
+    </Sheet>
   );
 }
 

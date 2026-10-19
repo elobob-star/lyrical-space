@@ -199,17 +199,41 @@ await page.mouse.move(lsb2.x + lsb2.width * 0.5, lsb2.y + lsb2.height / 2); awai
 await wait(350);
 ok('a plain press cuts at the nearest gap', (await page.locator('.strip').count()) === nBeforeSnip + 1);
 await key('Snip');
-// slash across the mat through a strip
-const slashTarget = await page.locator('.strip').first().boundingBox();
+// slash across the mat through a strip (start and end on bare mat, so nothing is picked up by accident)
+const slash = await page.evaluate(() => {
+  const board = document.querySelector('.board');
+  for (const el of document.querySelectorAll('.strip')) {
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width * 0.5;
+    const hit = (y) => document.elementFromPoint(x, y) === board;
+    if (el.querySelector('.gap') && hit(r.top - 30) && hit(r.bottom + 30)) return { x, y0: r.top - 30, y1: r.bottom + 30 };
+  }
+  return null;
+});
 const nBeforeSlash = await page.locator('.strip').count();
-const slx = slashTarget.x + slashTarget.width * 0.5;
-await page.mouse.move(slx, slashTarget.y - 50); await page.mouse.down();
-await page.mouse.move(slx + 4, slashTarget.y + slashTarget.height / 2, { steps: 6 });
-await page.mouse.move(slx + 8, slashTarget.y + slashTarget.height + 50, { steps: 6 });
-await page.mouse.up();
-await wait(350);
-ok('a slash across the mat cuts what it crosses (or politely finds nothing)', (await page.locator('.strip').count()) >= nBeforeSlash);
+const slashTarget = slash ?? {};
+if (slash) {
+  await page.mouse.move(slash.x, slash.y0); await page.mouse.down();
+  await page.mouse.move(slash.x + 4, (slash.y0 + slash.y1) / 2, { steps: 6 });
+  await page.mouse.move(slash.x + 8, slash.y1, { steps: 6 });
+  await page.mouse.up();
+  await wait(350);
+}
+ok('a slash across the mat cuts what it crosses', !slash || (await page.locator('.strip').count()) > nBeforeSlash, `${nBeforeSlash} -> ${await page.locator('.strip').count()} · ${JSON.stringify(slashTarget)} · ${await lcd()}`);
 await shot('21-table-snip');
+// the rare strip actions live behind "more"; one UNDO puts everything back
+{
+  const target = page.locator('.strip:has(.gap)').first();
+  const bx = await target.boundingBox();
+  const before = await page.locator('.strip').count();
+  await page.mouse.click(bx.x + 6, bx.y + 6); await wait(250);
+  await page.locator('.strip-actions button[aria-label="More"]').click();
+  await page.locator('.sheet .choice:has-text("SPLIT INTO WORDS")').click();
+  await wait(500);
+  ok('SPLIT INTO WORDS gives every word its own slip', (await page.locator('.strip').count()) > before, `${before} -> ${await page.locator('.strip').count()}`);
+  await page.click('.undo-chip'); await wait(400);
+  ok('UNDO glues the words back', (await page.locator('.strip').count()) === before);
+}
 // tape: drop a strip right under another one
 const bareSpot = () => page.evaluate(() => {
   const r = document.querySelector('.board').getBoundingClientRect();

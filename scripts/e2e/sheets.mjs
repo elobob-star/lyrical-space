@@ -13,6 +13,7 @@ await page.goto('http://127.0.0.1:5173/');
 await page.waitForSelector('.chassis:not(.boot)');
 await page.waitForTimeout(1200);
 await key('Sprint'); await shot('s01-sprint'); await close();
+await page.click('.legend button:nth-child(2)'); await page.waitForTimeout(500);
 await page.click('.slip-tab'); await page.keyboard.type('an overheard thing'); await shot('s02-catch'); await page.click('.slip-acts button:first-child');
 await page.click('.legend button:nth-child(3)'); await page.waitForTimeout(600);
 await page.click('.gut >> nth=0'); await shot('s03-line-menu'); await close();
@@ -40,7 +41,7 @@ await key('Words'); await page.waitForTimeout(400); await shot('s18-dark-words')
 await page.click('.gut >> nth=0'); await shot('s19-dark-line-menu'); await close();
 await page.click('.legend button:nth-child(2)'); await page.waitForTimeout(500); await key('Deal'); await shot('s20-dark-table');
 await page.click('.legend button:nth-child(1)'); await page.waitForTimeout(500); await shot('s21-dark-roll');
-await key('Stand'); await page.waitForTimeout(300);
-await page.click('.legend button:nth-child(3)').catch(() => {}); await page.waitForTimeout(400); await key('Stand'); await shot('s22-dark-stand');
+await page.click('.legend button:nth-child(3)'); await page.waitForTimeout(500);
+await key('Stand'); await page.waitForTimeout(500); await shot('s22-dark-stand');
 console.log(errors.join('\n') || 'no errors');
 await browser.close();

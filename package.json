@@ -1,7 +1,7 @@
 {
   "name": "portascribe",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "FOOLSCAP — a lyric notebook with a machine around it",
   "type": "module",
   "scripts": {
