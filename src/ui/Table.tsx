@@ -179,7 +179,11 @@ interface Drag {
   id: ID; pid: number; el: HTMLElement; px: number; py: number;
   ox: number; oy: number; rot: number; moved: boolean;
   nx: number; ny: number; lx: number; lt: number; tilt: number; r0: DOMRect;
-  others: Array<{ id: ID; el: HTMLElement; r: DOMRect }> | null; target: { id: ID; el: HTMLElement; how: Side } | null;
+  others: Array<{ id: ID; el: HTMLElement; r: DOMRect }> | null;
+  /** the edge being offered tape; it only sticks once `armed` (held there a moment) */
+  target: { id: ID; el: HTMLElement; how: Side; armed: boolean } | null;
+  /** edges the strip was already touching when it was picked up (two halves of a cut): no tape until it has left them */
+  ignore: Set<string>; armT?: number; seed?: boolean;
   aim: { cands: Cand[]; cur: Cand | null; x0: number; y0: number; slid: boolean } | null;
 }
 interface Slash { pid: number; x0: number; y0: number; x1: number; y1: number; on: boolean }
@@ -187,6 +191,8 @@ interface Ctl { down: (e: PointerEvent, s: Strip) => void; move: (e: PointerEven
 
 /** how close (px) a tap must land to a cut for it to count */
 const REACH = 26;
+/** Tape is never an accident: the edges have to (nearly) touch, overlap well, and be held together for a moment. */
+const TAPE_D = 14, TAPE_HOLD = 280;
 /** a long press must not open the system's context menu — it would cancel the touch the scissors are riding on */
 const noMenu = (e: Event) => e.preventDefault();
 
@@ -218,7 +224,7 @@ export function TableView() {
     const ro = new ResizeObserver(() => { size.current = { w: el.clientWidth, h: el.clientHeight }; rescue(); });
     ro.observe(el);
     size.current = { w: el.clientWidth, h: el.clientHeight };
-    hintOnce('table-cut-2', 'THE TABLE — DRAG A STRIP TO MOVE IT · TAP IT FOR THE SCISSORS · PUSH ONE AGAINST ANOTHER TO TAPE THEM');
+    hintOnce('table-cut-3', 'THE TABLE — DRAG A STRIP TO MOVE IT · TAP IT FOR THE SCISSORS · HOLD ONE AGAINST ANOTHER’S EDGE FOR A MOMENT TO TAPE THEM');
     return () => ro.disconnect();
   }, []);
   useEffect(() => () => { selected.value = null; }, []);
@@ -248,7 +254,11 @@ export function TableView() {
 
   const g = useRef<Drag | null>(null);
   const sl = useRef<Slash | null>(null);
-  const clearTarget = (d: Drag) => { d.target?.el.classList.remove('tape-stack', 'tape-join', 'tape-above', 'tape-before'); d.target = null; };
+  const clearTarget = (d: Drag) => {
+    clearTimeout(d.armT);
+    d.target?.el.classList.remove('tape-stack', 'tape-join', 'tape-above', 'tape-before', 'armed');
+    d.target = null;
+  };
 
   // ---- the guide: a dashed line (and a pair of scissors) showing exactly where the cut will fall ----
   const placeGuide = (c: Cand) => {
@@ -344,7 +354,7 @@ export function TableView() {
     try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const d: Drag = {
       id: s.id, pid: e.pointerId, el, px: e.clientX, py: e.clientY, ox: s.x, oy: s.y, rot: s.rot, moved: false,
-      nx: s.x, ny: s.y, lx: e.clientX, lt: performance.now(), tilt: 0, r0: el.getBoundingClientRect(), others: null, target: null, aim: null,
+      nx: s.x, ny: s.y, lx: e.clientX, lt: performance.now(), tilt: 0, r0: el.getBoundingClientRect(), others: null, target: null, aim: null, ignore: new Set(),
     };
     g.current = d;
     if (selected.peek() === s.id) beginAim(d, e.clientX, e.clientY);
@@ -367,6 +377,7 @@ export function TableView() {
       if (selected.value) selected.value = null;
       d.others = [...board.current!.querySelectorAll<HTMLElement>('.strip')].filter((x) => x.dataset.id !== d.id).map((x) => ({ id: x.dataset.id!, el: x, r: x.getBoundingClientRect() }));
       active.value = { id: d.id, kind: 'drag' };
+      d.seed = true;
     }
     const { w, h } = size.current;
     // the strip may hang off any edge of the mat, but never so far that it can't be picked up again
@@ -381,23 +392,40 @@ export function TableView() {
     d.tilt += (Math.max(-8, Math.min(8, vx * 12)) - d.tilt) * 0.35;
     d.lx = e.clientX; d.lt = now;
     d.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${d.rot + d.tilt}deg) scale(1.04)`;
-    // touching another strip's edge — any of its four — offers a piece of tape
+    // an edge of another strip (any of its four), nearly touching and well overlapped, offers a piece of tape —
+    // hold it there a moment and the tape sticks; slide on past, or drop it straight away, and it is just paper laid nearby
     const L = d.r0.left + dx, T = d.r0.top + dy, R = L + d.r0.width, B = T + d.r0.height;
-    let best: Drag['target'] = null, bestD = 24;
+    const first = !!d.seed;
+    d.seed = false;
+    let best: { id: ID; el: HTMLElement; how: Side } | null = null, bestD = TAPE_D;
     for (const o of d.others ?? []) {
-      const ovx = Math.min(R, o.r.right) - Math.max(L, o.r.left) > Math.min(d.r0.width, o.r.width) * 0.3;
-      const ovy = Math.min(B, o.r.bottom) - Math.max(T, o.r.top) > Math.min(d.r0.height, o.r.height) * 0.45;
-      const offer = (how: Side, dist: number, ok: boolean) => { if (ok && dist < bestD) { best = { id: o.id, el: o.el, how }; bestD = dist; } };
+      const ovx = Math.min(R, o.r.right) - Math.max(L, o.r.left) > Math.min(d.r0.width, o.r.width) * 0.4;
+      const ovy = Math.min(B, o.r.bottom) - Math.max(T, o.r.top) > Math.min(d.r0.height, o.r.height) * 0.55;
+      const offer = (how: Side, dist: number, ok: boolean) => {
+        const k = o.id + ':' + how;
+        if (first && ok && dist < TAPE_D + 6) { d.ignore.add(k); return; }
+        if (d.ignore.has(k)) { if (!ok || dist > TAPE_D + 24) d.ignore.delete(k); return; }
+        if (ok && dist < bestD) { best = { id: o.id, el: o.el, how }; bestD = dist; }
+      };
       offer('stack', Math.abs(T - o.r.bottom), ovx);
       offer('above', Math.abs(B - o.r.top), ovx);
       offer('join', Math.abs(L - o.r.right), ovy);
       offer('before', Math.abs(R - o.r.left), ovy);
     }
-    const bt = best as Drag['target'];
+    const bt = best as { id: ID; el: HTMLElement; how: Side } | null;
     if (bt?.id !== d.target?.id || bt?.how !== d.target?.how) {
       clearTarget(d);
-      if (bt) { bt.el.classList.add('tape-' + bt.how); haptic('light'); }
-      d.target = bt;
+      if (bt) {
+        const t = { ...bt, armed: false };
+        d.target = t;
+        bt.el.classList.add('tape-' + bt.how);
+        d.armT = window.setTimeout(() => {
+          if (g.current !== d || d.target !== t) return;
+          t.armed = true;
+          t.el.classList.add('armed');
+          haptic('medium');
+        }, TAPE_HOLD);
+      }
     }
   };
   const cancelDrag = (e?: PointerEvent) => {
@@ -421,7 +449,7 @@ export function TableView() {
       return;
     }
     if (d.moved) {
-      const tgt = d.target;
+      const tgt = d.target?.armed ? d.target : null;
       clearTarget(d);
       active.value = null;
       if (tgt) {

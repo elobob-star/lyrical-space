@@ -6,7 +6,7 @@ wrapped around warm, imperfect paper. Built to beat perfectionism, not to write 
 | Dial | Surface | Keys | Borrowed from |
 |---|---|---|---|
 | **NOTEBOOK** | a yellow legal pad of dated pages that belongs to no song — the app opens here | LATCH · PEN · DRAW · PUNCH · SPRINT | Dylan / Waits: just ramble. A fresh page after a break, old pages a flip back. The word you're typing erases; once you hit space, backspace strikes it through. UNDO when you want it. LATCH = forward only. PEN taps the gems, PUNCH files them into the shoebox. |
-| **TABLE** | a cutting mat with paper strips | SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP · UNDO | Bowie / Burroughs / Waits: tap a strip and tap where to cut (or slide to it), slash across the mat to cut several, push one against any edge of another to tape, let paper hang off the mat, deal scraps from the shoebox, cut everything up. |
+| **TABLE** | a cutting mat with paper strips | SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP · UNDO | Bowie / Burroughs / Waits: tap a strip and tap where to cut (or slide to it), slash across the mat to cut several, hold one against any edge of another for a moment to tape, let paper hang off the mat, deal scraps from the shoebox, cut everything up. |
 | **BENCH** | ruled index cards | WORDS · CHORDS · LENS · SHOEBOX · STAND | Cohen / Nick Drake: sections and takes, chord stamps, rhyme & meter lenses, hold-to-hum per card, tuning/capo/tempo, a scratch tape, and a music stand that scrolls at tempo. |
 
 **⏏ TAPES** opens the rack: cassette J-cards, the **Shoebox** (one pile for every stray line), the bin, tape history,
