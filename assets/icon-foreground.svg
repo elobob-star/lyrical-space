@@ -1,23 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ebe9e3"/><stop offset="1" stop-color="#c3c1b8"/></linearGradient>
-    <radialGradient id="k1" cx=".35" cy=".3"><stop offset="0" stop-color="#f6f4ee"/><stop offset="1" stop-color="#9d9a90"/></radialGradient>
-    <radialGradient id="k2" cx=".38" cy=".3"><stop offset="0" stop-color="#ff9a63"/><stop offset="1" stop-color="#e2470f"/></radialGradient>
-  </defs>
-  
-  
-  <g transform="translate(512 512) scale(.66) translate(-512 -512)"><!-- paper window with a few ruled lines -->
-  <rect x="150" y="150" width="724" height="300" rx="40" fill="#17181b"/>
-  <rect x="174" y="174" width="676" height="252" rx="26" fill="#e9e0cb"/>
-  <g stroke="#5f4823" stroke-opacity=".35" stroke-width="5"><path d="M214 250H810M214 310H810M214 370H700"/></g>
-  <path d="M214 232 C 270 190 300 270 360 232" stroke="#ff5b1f" stroke-width="12" fill="none" stroke-linecap="round"/>
-  <!-- knob -->
-  <circle cx="512" cy="690" r="215" fill="#17181b"/>
-  <circle cx="512" cy="690" r="190" fill="url(#k1)" stroke="#6d6a61" stroke-width="5"/>
-  <g stroke="#000" stroke-opacity=".25" stroke-width="5">
-    <path id="t" d="M512 520V548"/>
-  </g>
-  <circle cx="512" cy="690" r="124" fill="url(#k2)"/>
-  <circle cx="512" cy="690" r="124" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="4"/>
-  <path d="M512 590 L 512 676" stroke="#fff" stroke-width="22" stroke-linecap="round" transform="rotate(32 512 690)"/>
-</g></svg>
+  <g transform="translate(512 512) scale(.7) translate(-512 -512)"><!-- handwriting on the rules, a strike-through, and the rubber stamp -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M290 280 C 330 220 360 330 400 270 S 470 250 500 290 S 570 300 600 260 S 680 240 740 280" stroke="#1f2430" stroke-width="15"/>
+    <path d="M290 410 C 340 360 370 450 420 400 S 500 380 540 420 S 610 430 650 390" stroke="#1f2430" stroke-width="15"/>
+    <path d="M290 540 C 330 500 380 580 430 530 S 520 510 560 550" stroke="#1f2430" stroke-opacity=".38" stroke-width="15"/>
+    <path d="M282 548 L 580 530" stroke="#1f2430" stroke-opacity=".45" stroke-width="8"/>
+    <path d="M290 672 C 350 630 390 720 450 670 S 560 650 620 690 S 700 690 760 650" stroke="#e2470f" stroke-width="15"/>
+  </g></g>
+</svg>

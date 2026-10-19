@@ -1,8 +1,8 @@
 {
   "name": "portascribe",
   "private": true,
-  "version": "0.2.0",
-  "description": "PORTASCRIBE MK-II — a hardware-flavoured lyric notepad",
+  "version": "0.3.0",
+  "description": "FOOLSCAP — a lyric notebook with a machine around it",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

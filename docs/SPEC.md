@@ -1,4 +1,4 @@
-# PORTASCRIBE // MK-II — Product & Technical Spec
+# FOOLSCAP — Product & Technical Spec
 
 > A lyric notepad that behaves like a piece of studio hardware instead of an app.
 > Offline-first. No accounts, no API keys, no AI writing a word for you. Ships as an Android APK
@@ -8,7 +8,7 @@
 
 ## 1. Vision
 
-Most lyric apps are text editors with a rhyming dictionary stapled on. PORTASCRIBE is built
+Most lyric apps are text editors with a rhyming dictionary stapled on. FOOLSCAP is built
 around the *process* of writing a song, which is rarely linear, and around one specific enemy:
 **perfectionism** — the blank white page that makes every sentence look final.
 

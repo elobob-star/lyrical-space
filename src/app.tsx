@@ -124,7 +124,7 @@ export function App() {
   const ly = layer.value;
   useEffect(() => { if (ly === 'rack') (document.activeElement as HTMLElement | null)?.blur?.(); }, [ly]);
 
-  if (!ready.value) return <div class="chassis boot" data-chassis="alu"><div class="boot-msg">PORTASCRIBE MK-II<br /><small>WARMING UP…</small></div></div>;
+  if (!ready.value) return <div class="chassis boot" data-chassis="alu"><div class="boot-msg">FOOLSCAP<br /><small>WARMING UP…</small></div></div>;
 
   const st = settings.value;
   const m = mode.value;

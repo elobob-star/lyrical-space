@@ -1,6 +1,6 @@
 {
-  "name": "PORTASCRIBE MK-I",
-  "short_name": "Portascribe",
+  "name": "Foolscap",
+  "short_name": "Foolscap",
   "description": "A hardware-flavoured lyric notepad.",
   "start_url": "./",
   "display": "standalone",

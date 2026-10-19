@@ -244,7 +244,8 @@ export async function backupAll(): Promise<string> {
 /** Merge a backup into the library. */
 export async function importBackup(json: string): Promise<{ songs: number; scraps: number; pages: number }> {
   const data = JSON.parse(json);
-  if (data?.app !== 'portascribe') throw new Error('Not a Portascribe backup');
+  // the file marker stays 'portascribe' so backups move freely between this app and the earlier MK-I build
+  if (data?.app !== 'portascribe') throw new Error('Not a Foolscap backup');
   const inSongs: Song[] = data.songs ?? [];
   const inScraps: Scrap[] = (data.scraps ?? []).map(normalizeScrap);
   const blobs: Record<string, string> = data.blobs ?? {};

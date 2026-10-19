@@ -1,6 +1,6 @@
-# PORTASCRIBE // MK-II
+# FOOLSCAP
 
-A lyric notepad that behaves like a piece of studio hardware — a matte, Teenage-Engineering-style machine
+The notebook-first successor to Portascribe MK-I (it installs as its own app, `dev.foolscap.app`, so both can sit side by side; use BACKUP ALL → RESTORE to carry writing across, either way). A lyric notepad that behaves like a piece of studio hardware — a matte, Teenage-Engineering-style machine
 wrapped around warm, imperfect paper. Built to beat perfectionism, not to write for you.
 
 | Dial | Surface | Keys | Borrowed from |
