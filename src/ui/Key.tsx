@@ -53,6 +53,6 @@ export function Key(p: KeyProps) {
   );
 }
 
-export function Keys({ children }: { children: ComponentChildren }) {
-  return <div class="keys">{children}</div>;
+export function Keys({ children, dense }: { children: ComponentChildren; dense?: boolean }) {
+  return <div class={'keys' + (dense ? ' dense' : '')}>{children}</div>;
 }

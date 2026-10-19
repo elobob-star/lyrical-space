@@ -3,7 +3,8 @@ import { signal } from '@preact/signals';
 import {
   Chord, ID, Line, SectionKind, Song, activeTake, newLine, newSection, uid,
 } from './models';
-import { addScrap, currentSong, removeScrap, updateSong } from './state';
+import { addScrap, currentSong, removeScrap, songs, updateSong } from './state';
+import { pushUndo } from './undo';
 import { Edit, rebaseChords } from '../engine/textdiff';
 
 export const focused = signal<{ sid: ID; lid: ID } | null>(null);
@@ -15,8 +16,39 @@ const takeOf = (d: Song, sid: ID) => {
   const sec = d.sections.find((s) => s.id === sid);
   return sec ? activeTake(sec) : null;
 };
+const copy = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+const songById = (id: ID) => songs.peek().find((s) => s.id === id);
+
+/** Remember the lines of the section's active take: undo puts them back exactly as they were. */
+export function recordTake(songId: ID, sid: ID, label: string): void {
+  const song = songById(songId);
+  const t = song && takeOf(song, sid);
+  if (!t) return;
+  const snap = copy(t.lines);
+  pushUndo('bench', label, () => updateSong(songId, (d) => { const x = takeOf(d, sid); if (x) x.lines = copy(snap); }), songId);
+}
+/** Remember the section list and arrangement. */
+function recordArrangement(songId: ID, label: string): void {
+  const song = songById(songId);
+  if (!song) return;
+  const snap = copy({ sections: song.sections, arrangement: song.arrangement });
+  pushUndo('bench', label, () => updateSong(songId, (d) => { d.sections = copy(snap.sections); d.arrangement = copy(snap.arrangement); }), songId);
+}
+
+/** Typing in one breath is one undo step. */
+let burst: { lid: ID; at: number } | null = null;
 
 export function setLineText(songId: ID, sid: ID, lid: ID, text: string, edit: Edit): void {
+  const prev = songById(songId) && takeOf(songById(songId)!, sid)?.lines.find((x) => x.id === lid);
+  const now = Date.now();
+  if (prev && (!burst || burst.lid !== lid || now - burst.at > 900)) {
+    const was = { text: prev.text, chords: copy(prev.chords) };
+    pushUndo('bench', 'TYPING', () => updateSong(songId, (d) => {
+      const l = takeOf(d, sid)?.lines.find((x) => x.id === lid);
+      if (l) { l.text = was.text; l.chords = copy(was.chords); }
+    }), songId);
+  }
+  burst = { lid, at: now };
   updateSong(songId, (d) => {
     const t = takeOf(d, sid);
     const l = t?.lines.find((x) => x.id === lid);
@@ -27,6 +59,7 @@ export function setLineText(songId: ID, sid: ID, lid: ID, text: string, edit: Ed
 }
 
 export function splitLine(songId: ID, sid: ID, lid: ID, a: number, b: number): void {
+  recordTake(songId, sid, 'NEW LINE'); burst = null;
   const nl = newLine();
   updateSong(songId, (d) => {
     const t = takeOf(d, sid);
@@ -47,6 +80,7 @@ export function splitLine(songId: ID, sid: ID, lid: ID, a: number, b: number): v
 }
 
 export function mergeUp(songId: ID, sid: ID, lid: ID): boolean {
+  recordTake(songId, sid, 'JOIN LINES'); burst = null;
   let prevId: ID | null = null, caret = 0;
   updateSong(songId, (d) => {
     const t = takeOf(d, sid);
@@ -66,6 +100,7 @@ export function mergeUp(songId: ID, sid: ID, lid: ID): boolean {
 
 export function pasteLines(songId: ID, sid: ID, lid: ID, a: number, b: number, pasted: string): void {
   const parts = pasted.replace(/\r/g, '').split('\n');
+  recordTake(songId, sid, 'PASTE'); burst = null;
   let lastId: ID = lid;
   let lastCaret = 0;
   updateSong(songId, (d) => {
@@ -89,6 +124,7 @@ export function pasteLines(songId: ID, sid: ID, lid: ID, a: number, b: number, p
 }
 
 export function addLineAfter(songId: ID, sid: ID, lid: ID | null, text = ''): ID {
+  recordTake(songId, sid, 'NEW LINE');
   const nl = newLine(text);
   updateSong(songId, (d) => {
     const t = takeOf(d, sid);
@@ -101,6 +137,7 @@ export function addLineAfter(songId: ID, sid: ID, lid: ID | null, text = ''): ID
 }
 
 export function moveLine(songId: ID, sid: ID, lid: ID, dir: -1 | 1): void {
+  recordTake(songId, sid, 'MOVE LINE');
   updateSong(songId, (d) => {
     const t = takeOf(d, sid);
     if (!t) return;
@@ -112,6 +149,7 @@ export function moveLine(songId: ID, sid: ID, lid: ID, dir: -1 | 1): void {
 }
 
 export function duplicateLine(songId: ID, sid: ID, lid: ID): void {
+  recordTake(songId, sid, 'DUPLICATE LINE');
   updateSong(songId, (d) => {
     const t = takeOf(d, sid);
     if (!t) return;
@@ -146,7 +184,8 @@ export function removeLine(songId: ID, sid: ID, lid: ID): () => void {
 }
 
 // ---- chords ----
-export function placeChord(songId: ID, sid: ID, lid: ID, at: number, name: string): void {
+export function placeChord(songId: ID, sid: ID, lid: ID, at: number, name: string, rec = true): void {
+  if (rec) recordTake(songId, sid, 'CHORD');
   updateSong(songId, (d) => {
     const l = takeOf(d, sid)?.lines.find((x) => x.id === lid);
     if (!l) return;
@@ -157,7 +196,8 @@ export function placeChord(songId: ID, sid: ID, lid: ID, at: number, name: strin
   });
 }
 
-export function removeChord(songId: ID, sid: ID, lid: ID, at: number): Chord | null {
+export function removeChord(songId: ID, sid: ID, lid: ID, at: number, rec = true): Chord | null {
+  if (rec) recordTake(songId, sid, 'CHORD');
   let gone: Chord | null = null;
   updateSong(songId, (d) => {
     const l = takeOf(d, sid)?.lines.find((x) => x.id === lid);
@@ -181,6 +221,7 @@ export function snapToWord(text: string, at: number): number {
 
 // ---- arrangement ----
 export function addSection(songId: ID, kind: SectionKind, afterEntry?: ID): ID {
+  recordArrangement(songId, 'NEW SECTION');
   const sec = newSection(kind);
   updateSong(songId, (d) => {
     d.sections.push(sec);
@@ -192,6 +233,7 @@ export function addSection(songId: ID, kind: SectionKind, afterEntry?: ID): ID {
 }
 
 export function repeatEntry(songId: ID, entryId: ID): void {
+  recordArrangement(songId, 'REPEAT');
   updateSong(songId, (d) => {
     const i = d.arrangement.findIndex((a) => a.id === entryId);
     if (i < 0) return;
@@ -200,6 +242,7 @@ export function repeatEntry(songId: ID, entryId: ID): void {
 }
 
 export function moveEntry(songId: ID, entryId: ID, dir: -1 | 1): void {
+  recordArrangement(songId, 'MOVE SECTION');
   updateSong(songId, (d) => {
     const i = d.arrangement.findIndex((a) => a.id === entryId);
     const j = i + dir;

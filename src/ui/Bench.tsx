@@ -13,6 +13,8 @@ import {
   addLineAfter, addSection, duplicateLine, moveEntry, moveLine, removeEntry, removeLine, repeatEntry,
 } from '../store/lines';
 import { cmuTick, hintOnce, layer, lens, Lens, say, tray } from '../store/ui';
+import { pushUndo, undoable } from '../store/undo';
+import { UndoChip } from './UndoChip';
 import { settings } from '../store/state';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
@@ -29,6 +31,14 @@ const selectedEntry = signal<ID | null>(null);
 const sectionSheet = signal<ID | null>(null);
 const addSheet = signal(false);
 const takeSheet = signal<ID | null>(null);
+
+/** Snapshot one section so a take change can be undone. */
+function recordSec(song: Song, id: ID, label: string): void {
+  const sec = song.sections.find((s) => s.id === id);
+  if (!sec) return;
+  const snap = JSON.parse(JSON.stringify(sec));
+  pushUndo('bench', label, () => updateCurrent((d) => { const i = d.sections.findIndex((q) => q.id === id); if (i >= 0) d.sections[i] = snap; }));
+}
 
 const abbrev = (_song: Song, sec: Section, names: Map<ID, string>): string => sectionAbbrev(sec, names);
 
@@ -66,7 +76,7 @@ function SongMap({ song, names }: { song: Song; names: Map<ID, string> }) {
             const r = removeEntry(song.id, sel);
             selectedEntry.value = null;
             feel('thock', 'medium');
-            if (r) say(r.buried ? `REMOVED — ${r.buried} LINES KEPT IN THE SHOEBOX` : 'REMOVED FROM THE SONG', { label: 'UNDO', run: r.undo });
+            if (r) undoable('bench', r.buried ? `REMOVED — ${r.buried} LINES KEPT IN THE SHOEBOX` : 'REMOVED FROM THE SONG', r.undo, undefined, 'REMOVED');
           }}><Icon n="trash" size={15} />REMOVE</button>
         </div>
       )}
@@ -177,12 +187,12 @@ function LineMenu() {
         <button class="choice" onClick={() => {
           const gone = line.text.trim() ? cutLine(song.id, sec.id, line.id) : { text: '', undo: removeLine(song.id, sec.id, line.id) };
           close(); feel('snip', 'medium');
-          if (gone) say(gone.text ? 'CUT → SHOEBOX' : 'LINE REMOVED', { label: 'UNDO', run: gone.undo });
+          if (gone) undoable('bench', gone.text ? 'CUT → SHOEBOX' : 'LINE REMOVED', gone.undo);
         }}><span>CUT → SHOEBOX</span><small>keep it for another song</small></button>
         <button class="choice danger" onClick={() => {
           const undo = removeLine(song.id, sec.id, line.id);
           close(); feel('thock', 'medium');
-          say('LINE DELETED', { label: 'UNDO', run: undo });
+          undoable('bench', 'LINE DELETED', undo);
         }}><span>DELETE</span></button>
       </div>
     </Sheet>
@@ -202,7 +212,7 @@ function SectionSheet({ id }: { id: ID }) {
     <Sheet title={names.get(id) ?? 'SECTION'} onClose={close}>
       <div class="kinds">
         {SECTION_KINDS.map((k) => (
-          <button key={k} class={'kind' + (sec.kind === k ? ' on' : '')} onClick={() => { feel('click'); updateCurrent((d) => { const s = d.sections.find((q) => q.id === id); if (s) s.kind = k; }); }}>{k.toUpperCase()}</button>
+          <button key={k} class={'kind' + (sec.kind === k ? ' on' : '')} onClick={() => { feel('click'); recordSec(song, id, 'SECTION TYPE'); updateCurrent((d) => { const s = d.sections.find((q) => q.id === id); if (s) s.kind = k; }); }}>{k.toUpperCase()}</button>
         ))}
       </div>
       <div class="choices" style={{ marginTop: '10px' }}>
@@ -232,8 +242,8 @@ function TakeSheet({ id }: { id: ID }) {
     <Sheet title="TAKES" onClose={close}>
       <p class="hint">Swipe a section header left/right to flip between takes. Try a whole new angle without losing the old one.</p>
       <div class="choices">
-        <button class="choice" onClick={() => { addTake(song.id, id, false); close(); feel('chk', 'medium'); }}><span>+ BLANK TAKE</span><small>start fresh</small></button>
-        <button class="choice" onClick={() => { addTake(song.id, id, true); close(); feel('chk', 'medium'); }}><span>+ COPY OF THIS</span><small>revise a duplicate</small></button>
+        <button class="choice" onClick={() => { recordSec(song, id, 'NEW TAKE'); addTake(song.id, id, false); close(); feel('chk', 'medium'); }}><span>+ BLANK TAKE</span><small>start fresh</small></button>
+        <button class="choice" onClick={() => { recordSec(song, id, 'COPY OF TAKE'); addTake(song.id, id, true); close(); feel('chk', 'medium'); }}><span>+ COPY OF THIS</span><small>revise a duplicate</small></button>
         {sec.takes.length > 1 && (
           <button class="choice danger" onClick={() => {
             const t = activeTake(sec);
@@ -244,7 +254,7 @@ function TakeSheet({ id }: { id: ID }) {
               s.take = Math.max(0, Math.min(s.take, s.takes.length - 1));
             });
             close();
-            say(`TAKE DELETED (${t.lines.filter((l) => l.text.trim()).length} LINES)`, { label: 'UNDO', run: () => updateCurrent((d) => { const i = d.sections.findIndex((q) => q.id === id); if (i >= 0) d.sections[i] = snapshot; }) });
+            undoable('bench', `TAKE DELETED (${t.lines.filter((l) => l.text.trim()).length} LINES)`, () => updateCurrent((d) => { const i = d.sections.findIndex((q) => q.id === id); if (i >= 0) d.sections[i] = snapshot; }), undefined, 'TAKE DELETED');
           }}><span>DELETE THIS TAKE</span></button>
         )}
       </div>
@@ -359,9 +369,12 @@ function BenchTitle({ song }: { song: Song }) {
     );
   }
   return (
-    <button class="bench-title" aria-label="Song title" onClick={() => { feel('click'); setEditing(true); }}>
-      <span class="t">{song.title}</span><Icon n="edit" size={12} />
-    </button>
+    <div class="bench-title-row">
+      <button class="bench-title" aria-label="Song title" onClick={() => { feel('click'); setEditing(true); }}>
+        <span class="t">{song.title}</span><Icon n="edit" size={12} />
+      </button>
+      <UndoChip surface="bench" />
+    </div>
   );
 }
 

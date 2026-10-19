@@ -1,4 +1,5 @@
 import type { Chord, Mark } from '../store/models';
+import { uid } from '../store/models';
 
 export interface Edit { start: number; del: number; ins: number }
 
@@ -27,7 +28,12 @@ export function rebaseMarks(marks: Mark[], ed: Edit): Mark[] {
     let s = m.s, e = m.e;
     if (e <= ed.start) { /* before the edit */ }
     else if (s >= delEnd) { s += shift; e += shift; }
-    else {
+    else if (m.kind === 'ghost') {
+      // struck-out text never swallows what is typed into it: keep the struck halves, leave the new text clean
+      if (s < ed.start) out.push({ ...m, s, e: ed.start });
+      if (e > delEnd) out.push({ ...m, id: s < ed.start ? uid() : m.id, s: ed.start + ed.ins, e: e + shift });
+      continue;
+    } else {
       // overlap: drop the removed part; an insertion strictly inside the mark stretches it
       const ne = e > delEnd ? e + shift : ed.start;
       s = Math.min(s, ed.start);

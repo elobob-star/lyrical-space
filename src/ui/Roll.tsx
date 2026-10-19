@@ -4,19 +4,23 @@ import { currentSong, drawScraps, scraps, setSetting, settings, updateCurrent } 
 import { currentPage, flip, hasWords, pageId, pages, pendingMarks, punchPage, turnPage, updatePage } from '../store/notebook';
 import { Mark, Page, uid } from '../store/models';
 import { diffEdit, rebaseMarks } from '../engine/textdiff';
+import { InkOp, InkResult, Wet, addGhosts, cleanText, isWordCh, reduce, reduceDiff, stripGhosts } from '../engine/ink';
+import { Snap, canRedo, canUndo, openPage, record, redo as redoStep, undo as undoStep } from '../store/inkHistory';
 import { indexAtPoint } from '../engine/hit';
 import { feel, haptic, sound } from '../engine/feel';
-import { makeStrips } from '../store/actions';
+import { makeStrips, sendTextToBench } from '../store/actions';
+import { copyText, shareText } from '../engine/share';
+import { undoable } from '../store/undo';
 import { hintOnce, latch, pen, rollStats, say, sprint } from '../store/ui';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
 import { Sheet } from './Sheet';
 import { setMode } from './Bezel';
 
+/** keep the soft keyboard up when a small button is tapped */
+const keepFocus = (e: Event) => e.preventDefault();
 const pulsePen = signal(false);
 const sprintSheet = signal(false);
-
-const isWordCh = (c: string | undefined) => !!c && /[\p{L}\p{N}'’]/u.test(c);
 
 function snapWords(text: string, a: number, b: number): [number, number] {
   if (a > b) [a, b] = [b, a];
@@ -37,37 +41,6 @@ export function phraseAt(text: string, i: number): [number, number] | null {
   while (a < b && /\s/.test(text[a])) a++;
   while (b > a && /\s/.test(text[b - 1])) b--;
   return b > a ? [a, b] : null;
-}
-
-/** Merge a set of ghost ranges into the mark list (adjacent/overlapping ghosts fuse). */
-function addGhosts(marks: Mark[], ranges: Array<[number, number]>): Mark[] {
-  let ghosts = marks.filter((m) => m.kind === 'ghost').map((m) => ({ ...m }));
-  const rest = marks.filter((m) => m.kind !== 'ghost');
-  for (const [s, e] of ranges) {
-    if (e <= s) continue;
-    const hits = ghosts.filter((g) => g.s <= e && g.e >= s);
-    const ns = Math.min(s, ...hits.map((g) => g.s));
-    const ne = Math.max(e, ...hits.map((g) => g.e));
-    ghosts = ghosts.filter((g) => !hits.includes(g));
-    ghosts.push({ id: hits[0]?.id ?? uid(), s: ns, e: ne, kind: 'ghost' });
-  }
-  return [...rest, ...ghosts];
-}
-
-const isGhostAt = (marks: Mark[], i: number) => marks.some((m) => m.kind === 'ghost' && i >= m.s && i < m.e);
-
-/** Which characters become ghosts when [s,e) is "deleted" (already-ghost chars push the strike further left). */
-function strikeRanges(marks: Mark[], s: number, e: number): Array<[number, number]> {
-  const out: Array<[number, number]> = [[s, e]];
-  let fresh = 0;
-  for (let i = s; i < e; i++) if (!isGhostAt(marks, i)) fresh++;
-  let need = (e - s) - fresh;
-  let i = s - 1;
-  while (need > 0 && i >= 0) {
-    if (!isGhostAt(marks, i)) { out.push([i, i + 1]); need--; }
-    i--;
-  }
-  return out;
 }
 
 interface Seg { s: number; e: number; ghost: boolean; pencil: boolean; punched: boolean; preview: boolean }
@@ -163,8 +136,9 @@ export function RollView() {
   /** live page state: handlers can fire several times between renders, so never trust the render closure */
   const live = () => currentPage.peek()!;
   const write = (recipe: (d: Page) => void) => updatePage(currentPage.peek()!.id, recipe);
-  /** the word still being typed: backspace may really erase it (typo grace) */
-  const wet = useRef<{ s: number; e: number } | null>(null);
+  /** the ink still wet (the word being typed, and the space after the last one): backspace may really erase it */
+  const wet = useRef<Wet | null>(null);
+  const composing = useRef(false);
   const [preview, setPreviewState] = useState<[number, number] | null>(null);
   const pv = useRef<[number, number] | null>(null);
   const setPreview = (v: [number, number] | null) => { pv.current = v; setPreviewState(v); };
@@ -173,7 +147,9 @@ export function RollView() {
   const lt = latch.value;
 
   if (lastPage.current !== page.id) { lastPage.current = page.id; wet.current = null; }
-  useEffect(() => { hintOnce('notebook', 'THE NOTEBOOK — JUST RAMBLE. BACKSPACE STRIKES THROUGH, IT NEVER ERASES'); }, []);
+  useEffect(() => { openPage(page.id); }, [page.id]);
+  useEffect(() => { const w = wet.current; if (w && w.e > live().text.length) wet.current = null; }, [text]);
+  useEffect(() => { hintOnce('notebook', 'THE NOTEBOOK — JUST RAMBLE. A WORD YOU\'RE TYPING ERASES; ONCE YOU HIT SPACE IT STRIKES THROUGH'); }, []);
 
   // the mirror is in normal flow (it defines the page height); the textarea simply overlays it.
   useEffect(() => {
@@ -232,56 +208,103 @@ export function RollView() {
       requestAnimationFrame(() => { const e2 = ta.current; if (e2 && e2.value === nt) e2.setSelectionRange(caret, caret); });
     }
   };
-
-  const strike = (s: number, e: number, caretAfter: number) => {
-    const m = live().marks;
-    commit(live().text, addGhosts(m, strikeRanges(m, s, e)), caretAfter);
-    feel('key', null);
-    haptic('light');
-  };
   const refuse = () => { feel('thud', 'medium'); };
-  const ghostOn = () => settings.peek().ghost;
+  const opts = () => ({ ghost: settings.peek().ghost, latch: latch.peek() });
+  const inkState = () => ({ text: live().text, marks: live().marks, wet: wet.current });
+  const snapOf = (caret: number): Snap => ({ text: live().text, ghosts: live().marks.filter((m) => m.kind === 'ghost').map((m) => ({ ...m })), caret });
+
+  /** Put a reducer decision into the page. `sync` = the DOM must be brought in line (it was not, or must be put back). */
+  const applyInk = (res: InkResult, caretBefore: number, sync: boolean) => {
+    const el = ta.current;
+    wet.current = res.wet;
+    if (res.kind === 'refuse') {
+      if (el) { el.value = live().text; const n = live().text.length; el.setSelectionRange(n, n); }
+      refuse();
+      return;
+    }
+    if (res.kind === 'noop') {
+      if (el && sync) { el.value = live().text; el.setSelectionRange(res.caret, res.caret); }
+      haptic('light');
+      return;
+    }
+    record(live().id, snapOf(caretBefore), res.kind, Date.now(), res.kind === 'type' && /\n/.test(res.text.slice(Math.max(0, res.caret - 1), res.caret)));
+    commit(res.text, res.marks, sync || res.kind === 'strike' ? res.caret : undefined);
+    if (res.kind === 'strike') { feel('key', null); haptic('light'); }
+  };
+
+  const opFor = (type: string, a: number, b: number): InkOp | null => {
+    switch (type) {
+      case 'deleteContentBackward': return { t: 'back', from: a, to: b };
+      case 'deleteContentForward': return { t: 'fwd', from: a, to: b };
+      case 'deleteWordBackward': return { t: 'wordBack', from: a, to: b };
+      case 'deleteWordForward': return { t: 'wordFwd', from: a, to: b };
+      case 'deleteSoftLineBackward': case 'deleteHardLineBackward': return { t: 'lineBack', from: a, to: b };
+      default: return a !== b ? { t: 'back', from: a, to: b } : null; // cut, drag-out, …: a selection going away
+    }
+  };
+
+  // ----- undo / redo -----
+  const restore = (to: Snap) => {
+    const cur = live();
+    const ed = diffEdit(cur.text, to.text);
+    const pencils = rebaseMarks(cur.marks.filter((m) => m.kind !== 'ghost'), ed);
+    wet.current = null;
+    commit(to.text, [...pencils, ...to.ghosts.map((g) => ({ ...g }))], Math.min(to.caret, to.text.length));
+  };
+  const stepBack = () => {
+    const el = ta.current;
+    const cur = snapOf(el?.selectionStart ?? live().text.length);
+    const to = undoStep(cur);
+    if (!to) { haptic('light'); return; }
+    feel('click', 'light'); restore(to);
+  };
+  const stepForward = () => {
+    const el = ta.current;
+    const cur = snapOf(el?.selectionStart ?? live().text.length);
+    const to = redoStep(cur);
+    if (!to) { haptic('light'); return; }
+    feel('click', 'light'); restore(to);
+  };
+
+  /** typewriter scroll: as you write down the page it follows you, keeping the line you're on in the upper two thirds */
+  const follow = () => requestAnimationFrame(() => {
+    const el = ta.current, root = mirror.current, sc = scroller.current;
+    if (!el || !root || !sc || document.activeElement !== el) return;
+    const c = el.selectionStart;
+    let target: HTMLElement | null = null;
+    root.querySelectorAll<HTMLElement>('[data-s]').forEach((sp) => { if (Number(sp.dataset.s) <= c) target = sp; });
+    const sp = target as HTMLElement | null;
+    const node = sp?.firstChild;
+    if (!sp || !node) return;
+    const range = document.createRange();
+    range.setStart(node, Math.max(0, Math.min(c - Number(sp.dataset.s), node.textContent?.length ?? 0)));
+    range.collapse(true);
+    const r = range.getClientRects()[0] ?? sp.getBoundingClientRect();
+    const rel = r.top - sc.getBoundingClientRect().top;
+    const limit = sc.clientHeight * 0.62;
+    if (rel > limit) sc.scrollTop += rel - limit;
+  });
 
   const onBeforeInput = (ev: InputEvent) => {
-    const el = ta.current!;
-    const t = live().text;
-    const marksNow = live().marks;
-    const a = el.selectionStart, b = el.selectionEnd;
-    const type = ev.inputType;
     if (!ev.cancelable) return;
+    const el = ta.current!;
+    const type = ev.inputType;
+    const a = el.selectionStart, b = el.selectionEnd;
+    if (type === 'historyUndo') { ev.preventDefault(); stepBack(); return; }
+    if (type === 'historyRedo') { ev.preventDefault(); stepForward(); return; }
     if (type.startsWith('delete')) {
-      if (latch.value) { ev.preventDefault(); refuse(); return; }
-      if (!ghostOn()) return;
-      const w = wet.current;
-      // typo grace: still inside the word you're typing → a real erase
-      if (type === 'deleteContentBackward' && a === b && w && a === w.e && w.e > w.s) return;
+      const op = opFor(type, a, b);
+      if (!op) return;
       ev.preventDefault();
-      if (a !== b) { strike(a, b, b); wet.current = null; return; }
-      if (type === 'deleteContentForward') { if (a < t.length) strike(a, a + 1, a + 1); return; }
-      if (type === 'deleteWordForward') {
-        let e = a; while (e < t.length && /\s/.test(t[e])) e++; while (e < t.length && !/\s/.test(t[e])) e++;
-        strike(a, e, e); return;
-      }
-      if (type === 'deleteWordBackward' || type === 'deleteSoftLineBackward' || type === 'deleteHardLineBackward') {
-        let s = a; while (s > 0 && (/\s/.test(t[s - 1]) || isGhostAt(marksNow, s - 1))) s--;
-        while (s > 0 && !/\s/.test(t[s - 1]) && !isGhostAt(marksNow, s - 1)) s--;
-        strike(s, a, a); wet.current = null; return;
-      }
-      let i = a - 1;
-      while (i >= 0 && isGhostAt(marksNow, i)) i--;
-      if (i >= 0) strike(i, i + 1, a); else haptic('light');
-      wet.current = null;
+      applyInk(reduce(inkState(), op, opts()), a, true);
       return;
     }
     // typing over a selection: the old words are struck, the new ones go in after them
-    if (a !== b && (type === 'insertText' || type === 'insertFromPaste') && (latch.value || ghostOn())) {
+    if (a !== b && (type === 'insertText' || type === 'insertFromPaste') && (latch.peek() || settings.peek().ghost)) {
       const data = ev.data ?? (ev as any).dataTransfer?.getData?.('text') ?? '';
       if (!data) return;
       ev.preventDefault();
-      const ghosts = addGhosts(marksNow, strikeRanges(marksNow, a, b));
-      const nt = t.slice(0, b) + data + t.slice(b);
-      commit(nt, rebaseMarks(ghosts, { start: b, del: 0, ins: data.length }), b + data.length);
-      wet.current = null;
+      applyInk(reduce(inkState(), { t: 'ins', from: a, to: b, text: data }, opts()), a, true);
     }
   };
 
@@ -290,42 +313,39 @@ export function RollView() {
     const old = live().text;
     const nv = el.value;
     if (nv === old) return;
-    const caret = el.selectionStart;
-    const ed = diffEdit(old, nv, caret);
-    if (ed.del > 0 && ed.ins === 0) {
-      // deletions that slipped past beforeinput (Android IMEs): decide after the fact
-      const w = wet.current;
-      const graced = !latch.value && (!ghostOn() || (w && ed.start >= w.s && ed.start + ed.del <= w.e));
-      if (!graced) {
-        el.value = old;
-        if (latch.value) { el.setSelectionRange(old.length, old.length); refuse(); return; }
-        const m = live().marks;
-        const caretAfter = ed.start + ed.del;
-        commit(old, addGhosts(m, strikeRanges(m, ed.start, ed.start + ed.del)), caretAfter);
-        el.setSelectionRange(caretAfter, caretAfter);
-        feel('key', null);
-        wet.current = null;
-        return;
-      }
-      if (w) w.e = Math.max(w.s, w.e - ed.del);
-    } else if (ed.ins > 0) {
-      const added = nv.slice(ed.start, ed.start + ed.ins);
-      const w = wet.current;
-      if (/\s/.test(added)) {
-        const tail = /\S+$/.exec(added);
-        wet.current = tail ? { s: ed.start + ed.ins - tail[0].length, e: ed.start + ed.ins } : null;
-      } else if (w && ed.start >= w.s && ed.start + ed.del <= w.e) w.e = w.e - ed.del + ed.ins; // still the same word (IME composition grows it)
-      else wet.current = { s: ed.start, e: ed.start + ed.ins };
+    const ed = diffEdit(old, nv, el.selectionStart);
+    const { res, revert } = reduceDiff(inkState(), ed, nv, opts());
+    if (revert || res.kind === 'refuse') {
+      // an IME deleted something that should have been struck (or latched): put the page back and decide here
+      el.value = old;
+      applyInk(res, ed.start + ed.del, true);
+      return;
     }
-    commit(nv, rebaseMarks(live().marks, ed));
+    applyInk(res, ed.start, false);
+    // trust the real caret over the arithmetic: if they ever disagree, the caret is right
+    const w = wet.current, c = el.selectionStart;
+    if (w && c !== w.e && c > w.s && c <= live().text.length) w.e = c;
+    follow();
     const it = (ev as InputEvent).inputType;
     if (it === 'insertLineBreak' || it === 'insertParagraph') { if (settings.peek().keys) sound('ding'); }
     else if (it === 'insertText') sound('key');
   };
-  // moving the caret somewhere else dries the ink
+
+  // the caret leaving the wet ink dries it (anywhere inside it is still fine)
   const onCaret = () => {
     const el = ta.current, w = wet.current;
-    if (el && w && (el.selectionStart !== w.e || el.selectionEnd !== w.e)) wet.current = null;
+    if (!el || !w || composing.current) return;
+    if (el.selectionStart < w.s || el.selectionEnd > w.e) wet.current = null;
+  };
+  useEffect(() => {
+    document.addEventListener('selectionchange', onCaret);
+    return () => document.removeEventListener('selectionchange', onCaret);
+  }, []);
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'z') { e.preventDefault(); if (e.shiftKey) stepForward(); else stepBack(); }
+    else if (k === 'y') { e.preventDefault(); stepForward(); }
   };
 
   // ----- the pen: tap a phrase to mark it; press, hold, then drag for an exact range -----
@@ -453,8 +473,10 @@ export function RollView() {
               {page.fromSong && <small>FROM {page.fromSong}</small>}
             </button>
             <span class="grow" />
+            {canUndo.value && <button class="pg-nav pg-undo" aria-label="Undo" onMouseDown={keepFocus} onClick={stepBack}><Icon n="undo" size={15} stroke={2} /></button>}
+            {canRedo.value && <button class="pg-nav pg-undo" aria-label="Redo" onMouseDown={keepFocus} onClick={stepForward}><Icon n="redo" size={15} stroke={2} /></button>}
             <button class="pg-nav" aria-label="Earlier page" disabled={!prevP} onClick={() => go(-1)}><Icon n="left" size={15} stroke={2} /></button>
-            <span class="pg-n">P.{page.n}</span>
+            <button class="pg-n pg-menu" aria-label="This page" onClick={() => { feel('click'); pageMenu.value = true; }}>P.{page.n}</button>
             <button class="pg-nav" aria-label="Later page" disabled={!nextP} onClick={() => go(1)}><Icon n="right" size={15} stroke={2} /></button>
             <button class="pg-new" aria-label="New page" disabled={isLatest && !hasWords(page) && !page.spark}
               onClick={() => { flipDir = 1; pen.value = false; feel('tape', 'medium'); const p2 = turnPage(); say(`NEW PAGE · P.${p2.n}`); setTimeout(() => (document.querySelector('.roll-input') as HTMLTextAreaElement | null)?.focus(), 80); }}><Icon n="plus" size={15} stroke={2} /></button>
@@ -476,8 +498,8 @@ export function RollView() {
             <div class="roll-stack">
               <div class="roll-mirror" ref={mirror} aria-hidden="true">
                 {text === '' && <span class="ph">Start anywhere. Don't fix anything.{'\n'}Or press DRAW for a line from the shoebox.</span>}
-                {segs.map((s) => (
-                  <span data-s={s.s} key={s.s + '-' + s.e}
+                {segs.map((s, i) => (
+                  <span data-s={s.s} key={i}
                     class={(s.ghost ? 'g ' : '') + (s.pencil ? (s.punched ? 'p done ' : 'p ') : '') + (s.preview ? 'pv' : '')}>
                     {text.slice(s.s, s.e)}
                   </span>
@@ -487,18 +509,21 @@ export function RollView() {
               <div class="bail" style={{ height: bail + 'px' }} aria-hidden="true"><i /></div>
               <textarea ref={ta} class="roll-input" value={text} spellcheck={false} autocorrect="off" autocapitalize="sentences"
                 readOnly={g} inputMode={g ? 'none' : 'text'} aria-label="Notebook page"
-                onBeforeInput={onBeforeInput as any} onInput={onInput} onKeyUp={onCaret} onClick={onCaret} />
+                onBeforeInput={onBeforeInput as any} onInput={onInput} onKeyUp={onCaret} onClick={onCaret} onKeyDown={onKeyDown}
+                onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; onCaret(); }} />
             </div>
           </div>
         </div>
       </div>
       {pagesSheet.value && <PagesSheet />}
+      {pageMenu.value && <PageMenu />}
     </div>
   );
 }
 
 let flipDir: -1 | 0 | 1 = 0;
 const pagesSheet = signal(false);
+const pageMenu = signal(false);
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 export function stampDate(t: number): string {
@@ -506,6 +531,45 @@ export function stampDate(t: number): string {
   return `${DAYS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 const words = (t: string) => (t.match(/[\p{L}\p{N}'’]+/gu) ?? []).length;
+
+
+/** What you can do with the page in front of you. */
+function PageMenu() {
+  const close = () => (pageMenu.value = false);
+  const page = currentPage.value;
+  if (!page) return null;
+  const clean = cleanText(page.text, page.marks).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const struck = page.marks.some((m) => m.kind === 'ghost');
+  const song = currentSong.value;
+  return (
+    <Sheet title={`THIS PAGE · P.${page.n}`} onClose={close}>
+      <p class="hint">{words(page.text)} words{struck ? ' · some struck out' : ''}. Struck-out words are left out when you copy, share or send.</p>
+      <div class="choices">
+        <button class="choice" disabled={!clean} onClick={async () => { close(); feel('click'); if (await copyText(clean)) say('COPIED — WITHOUT THE STRUCK-OUT WORDS'); }}><span>COPY TEXT</span><small>to paste anywhere</small></button>
+        <button class="choice" disabled={!clean} onClick={() => { close(); void shareText(`Foolscap · P.${page.n}`, clean); }}><span>SHARE…</span><small>send the page to an app</small></button>
+        <button class="choice" disabled={!clean || !song} onClick={() => {
+          close();
+          if (!song) return;
+          const benchBefore = JSON.parse(JSON.stringify({ sections: song.sections, arrangement: song.arrangement }));
+          sendTextToBench(song.id, clean.split('\n'), 'new', 'verse');
+          feel('thock', 'medium');
+          undoable('bench', `P.${page.n} → A NEW VERSE ON THE BENCH`, () => updateCurrent((d) => { d.sections = benchBefore.sections; d.arrangement = benchBefore.arrangement; }), undefined, 'TO THE BENCH');
+          setMode('bench');
+        }}><span>TO THE BENCH</span><small>its lines become a new verse</small></button>
+        <button class="choice" disabled={!struck} onClick={() => {
+          close();
+          const cur = currentPage.peek();
+          if (!cur) return;
+          const was: Snap = { text: cur.text, ghosts: cur.marks.filter((m) => m.kind === 'ghost').map((m) => ({ ...m })), caret: cur.text.length };
+          const tidy = stripGhosts(cur.text, cur.marks);
+          record(cur.id, was, 'other');
+          updatePage(cur.id, (d) => { d.text = tidy.text; d.marks = tidy.marks; });
+          feel('shuffle', 'light'); say('STRUCK-OUT WORDS BURNED — UNDO BRINGS THEM BACK');
+        }}><span>BURN THE STRIKES</span><small>delete struck-out ink for good</small></button>
+      </div>
+    </Sheet>
+  );
+}
 
 function PagesSheet() {
   const close = () => (pagesSheet.value = false);

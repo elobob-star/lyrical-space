@@ -37,12 +37,31 @@ await page.keyboard.type('ld friend ');
 const len1 = (await ta.inputValue()).length;
 await page.keyboard.press('Backspace'); await page.keyboard.press('Backspace'); await page.keyboard.press('Backspace');
 await wait(120);
-ok('ghost ink: dry words are struck through, never erased', (await ta.inputValue()).length === len1, `${len1} -> ${(await ta.inputValue()).length}`);
+ok('ghost ink: the space just typed erases, then dry words are struck through, never erased', (await ta.inputValue()).length === len1 - 1, `${len1} -> ${(await ta.inputValue()).length}`);
 const ghostTxt = (await page.locator('.roll-mirror .g').allTextContents()).join('');
 ok('ghost spans hold the struck characters', ghostTxt.includes('nd'), JSON.stringify(ghostTxt));
 await page.keyboard.type('pal');
 ok('typing continues after the ghost', (await ta.inputValue()).endsWith('pal'));
 await shot('10-roll-ghost');
+// typing inside struck-out ink stays clean; undo / redo
+await page.keyboard.press('Control+End');
+await ta.evaluate((el) => { const i = el.value.indexOf('nd'); el.setSelectionRange(i + 1, i + 1); });
+await page.keyboard.type('QQ');
+await wait(80);
+const struckNow = (await page.locator('.roll-mirror .g').allTextContents()).join('|');
+ok('typing inside struck ink is not struck through', (await ta.inputValue()).includes('QQ') && !struckNow.includes('Q'), struckNow);
+ok('the page head offers UNDO once there is something to take back', (await page.locator('.pg-undo[aria-label="Undo"]').count()) === 1);
+await page.keyboard.press('Control+z');
+await wait(120);
+ok('undo takes the typed burst back', !(await ta.inputValue()).includes('QQ'));
+await page.keyboard.press('Control+Shift+z');
+await wait(120);
+ok('redo puts it back', (await ta.inputValue()).includes('QQ'));
+await page.locator('.pg-undo[aria-label="Undo"]').click();
+await wait(120);
+ok('the UNDO button works too', !(await ta.inputValue()).includes('QQ'));
+await page.keyboard.press('Control+End');
+await ta.click();
 
 // latch: forward only
 await key('Latch');
@@ -154,12 +173,42 @@ const lsb = await longStrip.boundingBox();
 await page.mouse.click(lsb.x + 8, lsb.y + 8);
 await wait(200);
 ok('tapping selects (action row appears)', (await page.locator('.strip-actions').count()) === 1);
+await page.mouse.click(lsb.x + lsb.width / 2, lsb.y + 3); // tap off: the bar must not sit in the way
+await wait(200);
 const gap = longStrip.locator('.gap').first();
 const gb = await gap.boundingBox();
 const nBeforeSnip = await page.locator('.strip').count();
-await page.mouse.click(gb.x + gb.width / 2, gb.y + gb.height / 2);
-await wait(250);
-ok('tapping a gap on a selected strip snips it', (await page.locator('.strip').count()) === nBeforeSnip + 1);
+// hold a strip and the scissors come out: a guide shows exactly where the cut falls; let go to cut
+await page.mouse.move(gb.x + gb.width / 2 + 6, gb.y + gb.height / 2); await page.mouse.down();
+await wait(520);
+ok('holding a strip brings out the scissors and a cut guide', (await page.locator('.cutguide:not([hidden])').count()) === 1);
+await shot('21-table-aim');
+await page.mouse.up();
+await wait(350);
+ok('letting go cuts at the guide', (await page.locator('.strip').count()) === nBeforeSnip + 1);
+ok('the table offers UNDO', (await page.locator('.undo-chip').count()) === 1);
+await page.click('.undo-chip');
+await wait(350);
+ok('UNDO glues it back', (await page.locator('.strip').count()) === nBeforeSnip);
+// the scissors tool: press anywhere on a strip, it cuts at the nearest gap
+await key('Snip');
+await wait(200);
+ok('SNIP lights up the scissors mode', (await page.locator('.board.cutting').count()) === 1);
+const lsb2 = await longStrip.boundingBox();
+await page.mouse.move(lsb2.x + lsb2.width * 0.5, lsb2.y + lsb2.height / 2); await page.mouse.down(); await wait(80); await page.mouse.up();
+await wait(350);
+ok('a plain press cuts at the nearest gap', (await page.locator('.strip').count()) === nBeforeSnip + 1);
+await key('Snip');
+// slash across the mat through a strip
+const slashTarget = await page.locator('.strip').first().boundingBox();
+const nBeforeSlash = await page.locator('.strip').count();
+const slx = slashTarget.x + slashTarget.width * 0.5;
+await page.mouse.move(slx, slashTarget.y - 50); await page.mouse.down();
+await page.mouse.move(slx + 4, slashTarget.y + slashTarget.height / 2, { steps: 6 });
+await page.mouse.move(slx + 8, slashTarget.y + slashTarget.height + 50, { steps: 6 });
+await page.mouse.up();
+await wait(350);
+ok('a slash across the mat cuts what it crosses (or politely finds nothing)', (await page.locator('.strip').count()) >= nBeforeSlash);
 await shot('21-table-snip');
 // tape: drop a strip right under another one
 const bareSpot = () => page.evaluate(() => {
@@ -186,6 +235,7 @@ const grip = await B.evaluate((el) => {
   }
   return null;
 });
+if (!grip) console.log('DEBUG no grip', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.strip')].map((e) => ({ id: e.dataset.id, r: e.getBoundingClientRect().toJSON(), z: e.style.zIndex })))), JSON.stringify(bb));
 await drag(grip.x, grip.y, ab.x + 4 + grip.dx, ab.y + ab.height + grip.dy, 16);
 await wait(300);
 ok('dropping on an edge tapes the strips together', (await all.count()) === nBeforeTape - 1, `${nBeforeTape} -> ${await all.count()}`);
@@ -372,9 +422,9 @@ ok('the rack now has two tapes', (await page.locator('.jcard').count()) === 2);
 await page.click('button[aria-label="Tapes"]');
 
 // ================= SETUP =================
-await page.click('button[aria-label="Tapes"]');
-await page.click('.rack button[aria-label="Setup"]');
-await page.waitForSelector('.sheet .dip-row');
+await page.click('.lcd-gear');
+await page.waitForSelector('.sheet .sw-row');
+ok('the gear on the LCD opens Setup in one tap', (await page.locator('.sheet').count()) === 1);
 await page.click('.sheet button:has-text("CHARCOAL")');
 await wait(150);
 ok('finish switches to charcoal', (await page.locator('.chassis').getAttribute('data-chassis')) === 'charcoal');
