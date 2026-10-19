@@ -79,6 +79,18 @@ ok('a line moved down', (await lineTexts())[1] === firstText);
 await page.locator('.bench .undo-chip').click();
 await wait(200);
 ok('UNDO puts it back', (await lineTexts())[0] === firstText);
+// delete a line from its menu, then UNDO puts it back (once threw on a revoked immer draft)
+{
+  const n0 = (await lineTexts()).length;
+  const victim = (await lineTexts())[1];
+  await page.click('.gut >> nth=1');
+  await page.locator('.sheet .choice.danger').click();
+  await wait(200);
+  ok('DELETE removes the line', (await lineTexts()).length === n0 - 1);
+  await page.locator('.bench .undo-chip').click();
+  await wait(200);
+  ok('UNDO brings the deleted line back', (await lineTexts()).length === n0 && (await lineTexts())[1] === victim);
+}
 // tempo
 const bpm0 = await page.locator('.dchip:has(i:text("BPM")) b').textContent();
 await page.locator('.dchip:has(i:text("BPM"))').click();

@@ -3,7 +3,7 @@
 import { signal } from '@preact/signals';
 import type { Mark } from './models';
 
-export interface Snap { text: string; ghosts: Mark[]; caret: number }
+export interface Snap { text: string; ghosts: Mark[]; caret: number; /** exact pencil marks, for steps that rewrite the text in several places (burning the strikes) */ pencils?: Mark[] }
 export type InkStep = 'type' | 'strike' | 'erase' | 'other';
 
 const MAX = 150;
@@ -14,6 +14,8 @@ let page = '';
 let lastAt = 0;
 let lastKind: InkStep | '' = '';
 
+/** bumps when something outside the editor rewrote the page (it must forget which ink is still wet) */
+export const inkReset = signal(0);
 export const canUndo = signal(false);
 export const canRedo = signal(false);
 const sync = () => { canUndo.value = past.length > 0; canRedo.value = future.length > 0; };

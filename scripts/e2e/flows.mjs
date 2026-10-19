@@ -16,6 +16,14 @@ const lcd = async () => (await page.locator('.lcd').textContent()) ?? '';
 const wait = (ms) => page.waitForTimeout(ms);
 const key = (label) => page.click(`.bezel-bottom button[aria-label="${label}"]`);
 const dial = (i) => page.click(`.legend button:nth-child(${i})`);
+// a point on a strip that is really that strip (not covered by a neighbour)
+const grabPoint = (loc) => loc.evaluate((el) => {
+  const r = el.getBoundingClientRect();
+  for (let y = r.top + 8; y < r.bottom - 4; y += 5) for (let x = r.left + 10; x < r.right - 8; x += 8) {
+    if (document.elementFromPoint(x, y)?.closest('.strip') === el) return { x, y };
+  }
+  return null;
+});
 const drag = async (x0, y0, x1, y1, steps = 10) => { await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x1, y1, { steps }); await page.mouse.up(); };
 
 await page.goto(URL);
@@ -147,6 +155,7 @@ await wait(150);
 await key('Pen');
 await key('Punch');
 await wait(700);
+if (process.env.DEBUG) console.log('DEBUG before ON TABLE:', JSON.stringify(await lcd()), 'marks', await page.locator('.roll-mirror .p').count(), 'pen', await page.locator('.roll.pen').count());
 await page.click('.lcd'); // ON TABLE
 await wait(700);
 ok('LCD action lays punched lines on the Table', (await page.locator('.board').count()) === 1);
@@ -162,15 +171,28 @@ await shot('20-table-dealt');
 // drag
 const s0 = page.locator('.strip').first();
 let b0 = await s0.boundingBox();
-await drag(b0.x + 12, b0.y + 10, b0.x + 30, b0.y + 140, 8);
+const g0 = await grabPoint(s0);
+await drag(g0.x, g0.y, g0.x + 18, g0.y + 130, 8);
 await wait(250);
 const b0b = await s0.boundingBox();
 ok('strips drag', Math.abs(b0b.y - b0.y) > 90, `dy ${Math.round(b0b.y - b0.y)}`);
+{
+  // pick a strip up, then drag that same strip: it must keep its lifted look all the way (a re-render once wiped it)
+  const sB = page.locator('.strip:has(.gap)').first();
+  const gp = await grabPoint(sB);
+  await page.mouse.click(gp.x, gp.y); await wait(250);
+  await page.mouse.move(gp.x, gp.y); await page.mouse.down();
+  await page.mouse.move(gp.x + 40, gp.y + 70, { steps: 6 }); await wait(150);
+  const lifted = await sB.evaluate((el) => el.classList.contains('dragging'));
+  await page.mouse.up(); await wait(300);
+  ok('a selected strip keeps its lifted look while it is dragged', lifted);
+}
 // select + snip at a gap
 const longId = await page.locator('.strip').filter({ has: page.locator('.gap') }).first().getAttribute('data-id');
 const longStrip = page.locator(`.strip[data-id="${longId}"]`);
 const lsb = await longStrip.boundingBox();
-await page.mouse.click(lsb.x + 8, lsb.y + 8);
+const lgp = await grabPoint(longStrip);
+await page.mouse.click(lgp.x, lgp.y);
 await wait(200);
 ok('tapping selects (action row appears)', (await page.locator('.strip-actions').count()) === 1);
 await page.mouse.click(lsb.x + lsb.width / 2, lsb.y + 3); // tap off: the bar must not sit in the way
@@ -246,20 +268,24 @@ const spot = await bareSpot();
 await page.mouse.click(spot.x, spot.y); // deselect: the action row must not sit over the strip we grab
 await wait(400);
 const all = page.locator('.strip');
-// tape onto the highest strip so there is room underneath it
-const ids = await all.evaluateAll((els) => els.map((e) => ({ id: e.dataset.id, top: e.getBoundingClientRect().top })).sort((a, b) => a.top - b.top).map((x) => x.id));
-const A = page.locator(`.strip[data-id="${ids[0]}"]`), B = page.locator(`.strip[data-id="${ids[ids.length - 1]}"]`);
-const ab = await A.boundingBox(), bb = await B.boundingBox();
-const nBeforeTape = await all.count();
-// grab B where it is actually on top (another strip may overlap part of it)
-const grip = await B.evaluate((el) => {
-  const r = el.getBoundingClientRect();
-  for (let y = r.top + 6; y < r.bottom - 4; y += 6) for (let x = r.left + 8; x < r.right - 8; x += 10) {
-    if (document.elementFromPoint(x, y)?.closest('.strip') === el) return { x, y, dx: x - r.left, dy: y - r.top };
-  }
+// tape onto the highest strip so there is room underneath it; grab the lowest strip that has an uncovered spot to hold it by
+const picks = await all.evaluateAll((els) => {
+  const rows = els.map((el) => ({ id: el.dataset.id, el, top: el.getBoundingClientRect().top })).sort((a, b) => a.top - b.top);
+  const grabAt = (el) => {
+    const r = el.getBoundingClientRect();
+    for (let y = r.top + 6; y < r.bottom - 4; y += 6) for (let x = r.left + 8; x < r.right - 8; x += 10) {
+      if (document.elementFromPoint(x, y)?.closest('.strip') === el) return { x, y, dx: x - r.left, dy: y - r.top };
+    }
+    return null;
+  };
+  const a = rows[0];
+  for (let i = rows.length - 1; i > 0; i--) { const g = grabAt(rows[i].el); if (g) return { a: a.id, b: rows[i].id, grip: g }; }
   return null;
 });
-if (!grip) console.log('DEBUG no grip', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('.strip')].map((e) => ({ id: e.dataset.id, r: e.getBoundingClientRect().toJSON(), z: e.style.zIndex })))), JSON.stringify(bb));
+const A = page.locator(`.strip[data-id="${picks.a}"]`), B = page.locator(`.strip[data-id="${picks.b}"]`);
+const ab = await A.boundingBox(), bb = await B.boundingBox();
+const nBeforeTape = await all.count();
+const grip = picks.grip;
 await drag(grip.x, grip.y, ab.x + 4 + grip.dx, ab.y + ab.height + grip.dy, 16);
 await wait(300);
 ok('dropping on an edge tapes the strips together', (await all.count()) === nBeforeTape - 1, `${nBeforeTape} -> ${await all.count()}`);

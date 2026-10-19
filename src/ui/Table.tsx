@@ -15,6 +15,8 @@ import { UndoChip } from './UndoChip';
 import { setMode } from './Bezel';
 
 const selected = signal<ID | null>(null);
+/** which strip is being dragged or aimed with: part of the render, so a re-render can never wipe it */
+const active = signal<{ id: ID; kind: 'drag' | 'aim' } | null>(null);
 const sheetState = signal<null | { kind: 'new'; x: number; y: number } | { kind: 'edit'; id: ID } | { kind: 'bench'; id: ID } | { kind: 'more'; id: ID }>(null);
 /** stagger for strips that just landed (deal / cut-up) */
 const arrival = new Map<ID, number>();
@@ -148,25 +150,25 @@ function clipSeg(x0: number, y0: number, x1: number, y1: number, r: DOMRect, pad
 }
 
 interface Drag {
-  id: ID; el: HTMLElement; hit: HTMLElement; px: number; py: number; cx: number; cy: number;
+  id: ID; pid: number; el: HTMLElement; hit: HTMLElement; px: number; py: number; cx: number; cy: number;
   ox: number; oy: number; rot: number; moved: boolean; dead: boolean; hold?: number;
   nx: number; ny: number; lx: number; lt: number; tilt: number; r0: DOMRect;
   others: Array<{ id: ID; el: HTMLElement; r: DOMRect }> | null; target: { id: ID; el: HTMLElement; how: TapeHow } | null;
   aim: { cands: Cand[]; cur: Cand | null } | null;
 }
-interface Slash { x0: number; y0: number; x1: number; y1: number; on: boolean }
-interface Ctl { down: (e: PointerEvent, s: Strip) => void; move: (e: PointerEvent) => void; up: (e: PointerEvent, s: Strip) => void; cancel: () => void }
+interface Slash { pid: number; x0: number; y0: number; x1: number; y1: number; on: boolean }
+interface Ctl { down: (e: PointerEvent, s: Strip) => void; move: (e: PointerEvent) => void; up: (e: PointerEvent, s: Strip) => void; cancel: (e?: PointerEvent) => void }
 
 const HOLD_MS = 330;
 /** a long press must not open the system's context menu — it would cancel the touch the scissors are riding on */
 const noMenu = (e: Event) => e.preventDefault();
 
-const StripView = memo(function StripView({ s, sel, delay, ctl }: { s: Strip; sel: boolean; delay?: number; ctl: Ctl }) {
+const StripView = memo(function StripView({ s, sel, mode, delay, ctl }: { s: Strip; sel: boolean; mode: '' | 'drag' | 'aim'; delay?: number; ctl: Ctl }) {
   return (
     <div data-id={s.id} data-rot={s.rot}
-      class={'strip f-' + s.from + (sel ? ' sel' : '') + (delay !== undefined ? ' landing' : '')}
+      class={'strip f-' + s.from + (sel ? ' sel' : '') + (mode === 'drag' ? ' dragging' : mode === 'aim' ? ' aiming' : '') + (delay !== undefined ? ' landing' : '')}
       style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%`, zIndex: s.z, transform: `rotate(${s.rot}deg)`, '--r': s.rot, '--x': s.x, animationDelay: delay !== undefined ? `${delay}ms` : undefined } as any}
-      onPointerDown={(e) => ctl.down(e as any, s)} onPointerMove={ctl.move as any} onPointerUp={(e) => ctl.up(e as any, s)} onPointerCancel={ctl.cancel}
+      onPointerDown={(e) => ctl.down(e as any, s)} onPointerMove={ctl.move as any} onPointerUp={(e) => ctl.up(e as any, s)} onPointerCancel={ctl.cancel as any}
       onContextMenu={noMenu}>
       <i class="shade" aria-hidden="true" />
       <div class="paper" style={{ clipPath: edges(s.id) }}><StripBody s={s} /></div>
@@ -182,6 +184,7 @@ export function TableView() {
   const size = useRef({ w: 360, h: 600 });
   const sheet = sheetState.value;
   const sel = selected.value;
+  const act = active.value;
   const cut = cutting.value;
 
   useEffect(() => {
@@ -219,7 +222,7 @@ export function TableView() {
     const cands = candidates(d.el);
     if (!cands.length) { d.dead = true; say('ONE WORD — NOTHING TO CUT'); feel('thud', 'light'); return; }
     d.aim = { cands, cur: null };
-    d.el.classList.add('aiming');
+    active.value = { id: d.id, kind: 'aim' };
     haptic('medium');
     aimMove(d, x, y, true);
   };
@@ -231,7 +234,7 @@ export function TableView() {
     placeGuide(hit.c);
     if (!first) haptic('light');
   };
-  const endAim = (d: Drag) => { hideGuide(); d.el.classList.remove('aiming'); };
+  const endAim = (d: Drag) => { hideGuide(); if (active.peek()?.id === d.id && active.peek()?.kind === 'aim') active.value = null; };
 
   /** Cut each strip at the chosen place. One UNDO takes back the lot. */
   const doCut = (items: Array<{ id: ID; cand: Cand }>): boolean => {
@@ -283,11 +286,12 @@ export function TableView() {
 
   // ---- strip pointer handling (drag writes straight to the DOM: no re-render per move) ----
   const onDown = (e: PointerEvent, s: Strip) => {
+    if (g.current) { if (g.current.pid !== e.pointerId) return; cancelDrag(); } // a second finger is ignored; a lost gesture is cleaned up
     const el = e.currentTarget as HTMLElement;
     const hit = e.target as HTMLElement; // remember before capture retargets the pointer
     try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const d: Drag = {
-      id: s.id, el, hit, px: e.clientX, py: e.clientY, cx: e.clientX, cy: e.clientY, ox: s.x, oy: s.y, rot: s.rot, moved: false, dead: false,
+      id: s.id, pid: e.pointerId, el, hit, px: e.clientX, py: e.clientY, cx: e.clientX, cy: e.clientY, ox: s.x, oy: s.y, rot: s.rot, moved: false, dead: false,
       nx: s.x, ny: s.y, lx: e.clientX, lt: performance.now(), tilt: 0, r0: el.getBoundingClientRect(), others: null, target: null, aim: null,
     };
     g.current = d;
@@ -297,7 +301,7 @@ export function TableView() {
   };
   const onMove = (e: PointerEvent) => {
     const d = g.current;
-    if (!d || d.dead) return;
+    if (!d || d.dead || e.pointerId !== d.pid) return;
     d.cx = e.clientX; d.cy = e.clientY;
     if (d.aim) { aimMove(d, e.clientX, e.clientY); return; }
     let dx = e.clientX - d.px, dy = e.clientY - d.py;
@@ -306,7 +310,7 @@ export function TableView() {
       d.moved = true; clearTimeout(d.hold); haptic('light');
       if (selected.value) selected.value = null;
       d.others = [...board.current!.querySelectorAll<HTMLElement>('.strip')].filter((x) => x.dataset.id !== d.id).map((x) => ({ id: x.dataset.id!, el: x, r: x.getBoundingClientRect() }));
-      d.el.classList.add('dragging');
+      active.value = { id: d.id, kind: 'drag' };
     }
     const { w, h } = size.current;
     // the strip stays on the mat: its whole width and height, not just its corner
@@ -337,20 +341,20 @@ export function TableView() {
       d.target = best;
     }
   };
-  const cancelDrag = () => {
+  const cancelDrag = (e?: PointerEvent) => {
     const d = g.current;
+    if (!d || (e && e.pointerId !== d.pid)) return;
     g.current = null;
-    if (!d) return;
     clearTimeout(d.hold);
     clearTarget(d);
-    endAim(d);
-    d.el.classList.remove('dragging');
+    hideGuide();
+    active.value = null;
     d.el.style.transform = `rotate(${d.rot}deg)`;
   };
   const onUp = (e: PointerEvent, s: Strip) => {
     const d = g.current;
+    if (!d || e.pointerId !== d.pid) return;
     g.current = null;
-    if (!d) return;
     clearTimeout(d.hold);
     if (d.aim) {
       endAim(d);
@@ -363,7 +367,7 @@ export function TableView() {
     if (d.moved) {
       const tgt = d.target;
       clearTarget(d);
-      d.el.classList.remove('dragging');
+      active.value = null;
       const before = snapshot();
       if (tgt) {
         d.el.style.transform = `rotate(${d.rot}deg)`;
@@ -400,12 +404,13 @@ export function TableView() {
   const bare = (e: PointerEvent) => e.target === e.currentTarget;
   const matDown = (e: PointerEvent) => {
     if (!bare(e)) return;
+    if (sl.current || g.current) return; // one finger at a time
     try { board.current!.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-    sl.current = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, on: false };
+    sl.current = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, on: false };
   };
   const matMove = (e: PointerEvent) => {
     const s = sl.current;
-    if (!s) return;
+    if (!s || e.pointerId !== s.pid) return;
     s.x1 = e.clientX; s.y1 = e.clientY;
     const len = Math.hypot(s.x1 - s.x0, s.y1 - s.y0);
     if (!s.on && len > 22) { s.on = true; haptic('light'); if (selected.value) selected.value = null; }
@@ -418,6 +423,7 @@ export function TableView() {
   };
   const matUp = (e: PointerEvent) => {
     const s = sl.current;
+    if (s && e.pointerId !== s.pid) return;
     sl.current = null;
     if (slashEl.current) slashEl.current.hidden = true;
     if (!bare(e)) return;
@@ -465,7 +471,7 @@ export function TableView() {
 
   return (
     <div class={'mode-view table' + (cut ? ' cutting' : '')}>
-      <div class={'board' + (cut ? ' cutting' : '')} ref={board} onContextMenu={noMenu} onPointerDown={matDown as any} onPointerMove={matMove as any} onPointerUp={matUp as any} onPointerCancel={() => { sl.current = null; if (slashEl.current) slashEl.current.hidden = true; }}>
+      <div class={'board' + (cut ? ' cutting' : '')} ref={board} onContextMenu={noMenu} onPointerDown={matDown as any} onPointerMove={matMove as any} onPointerUp={matUp as any} onPointerCancel={(e) => { if (sl.current && (e as any).pointerId !== sl.current.pid) return; sl.current = null; if (slashEl.current) slashEl.current.hidden = true; }}>
         <div class="mat-rule" aria-hidden="true" />
         <div class="mat-label" aria-hidden="true">{song.title}</div>
         <UndoChip surface="table" />
@@ -476,7 +482,7 @@ export function TableView() {
             <span>Press DEAL for lines from the shoebox — punched from the notebook or caught along the way — or double-tap the mat to write a slip.</span>
           </div>
         )}
-        {strips.map((s) => <StripView key={s.id} s={s} sel={sel === s.id} delay={arrival.get(s.id)} ctl={ctl} />)}
+        {strips.map((s) => <StripView key={s.id} s={s} sel={sel === s.id} mode={act?.id === s.id ? act.kind : ''} delay={arrival.get(s.id)} ctl={ctl} />)}
         <div class="cutguide" ref={guide} hidden aria-hidden="true"><i><Icon n="scissors" size={13} stroke={2} /></i></div>
         <div class="slash" ref={slashEl} hidden aria-hidden="true" />
         {selStrip && (
@@ -605,15 +611,16 @@ function BenchChooser({ id }: { id: ID }) {
   if (!strip) return null;
   const go = (target: ID | 'new', kind?: SectionKind) => {
     const before = snapshot();
-    const benchBefore = JSON.parse(JSON.stringify({ sections: song.sections, arrangement: song.arrangement }));
-    const sid = sendTextToBench(song.id, [strip.text], target, kind);
+    const sent = sendTextToBench(song.id, [strip.text], target, kind);
+    const sid = sent.sid;
     updateCurrent((d) => { d.table = d.table.filter((x) => x.id !== id); });
     selected.value = null;
     feel('thock', 'medium');
     close();
     const nm = sectionNames(currentSong.peek()!).get(sid) ?? (kind ?? 'verse').toUpperCase();
     say(`→ ${nm}`, { label: 'GO', run: () => setMode('bench') });
-    pushUndo('table', 'SENT TO THE BENCH', () => updateCurrent((d) => { d.table = before; d.sections = benchBefore.sections; d.arrangement = benchBefore.arrangement; }));
+    // undo puts the strip back and takes exactly those lines off the bench again — anything written there since stays
+    pushUndo('table', 'SENT TO THE BENCH', () => { restore(before); sent.undo(); });
   };
   return (
     <Sheet title="SLOT INTO THE BENCH" onClose={close}>

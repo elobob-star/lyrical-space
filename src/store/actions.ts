@@ -75,9 +75,10 @@ export function cutLine(songId: ID, sectionId: ID, lineId: ID): { text: string; 
   const sec = song?.sections.find((s) => s.id === sectionId);
   if (!song || !sec) return null;
   const take = activeTake(sec);
+  const tid = take.id;
   const idx = take.lines.findIndex((l) => l.id === lineId);
   if (idx < 0) return null;
-  const line = take.lines[idx];
+  const line = JSON.parse(JSON.stringify(take.lines[idx]));
   const text = line.text.trim();
   const scrap = text ? addScrap(text, 'cut', songId) : null;
   updateSong(songId, (d) => {
@@ -89,9 +90,13 @@ export function cutLine(songId: ID, sectionId: ID, lineId: ID): { text: string; 
     text,
     undo: () => {
       updateSong(songId, (d) => {
-        const t = activeTake(d.sections.find((s) => s.id === sectionId)!);
+        const s = d.sections.find((q) => q.id === sectionId);
+        const i = s ? s.takes.findIndex((t) => t.id === tid) : -1;
+        if (!s || i < 0) return; // the section or take is gone: nothing sensible to put the line back into
+        const t = s.takes[i];
         if (t.lines.length === 1 && !t.lines[0].text) t.lines.splice(0, 1);
-        t.lines.splice(Math.min(idx, t.lines.length), 0, line);
+        t.lines.splice(Math.min(idx, t.lines.length), 0, JSON.parse(JSON.stringify(line)));
+        s.take = i;
       });
       if (scrap) removeScrap(scrap.id);
     },
@@ -108,25 +113,45 @@ export function ensureSection(d: Song, kind: SectionKind = 'verse'): Section {
   return d.sections[d.sections.length - 1];
 }
 
-/** Append text lines to the active take of a section (or a brand-new one). */
-export function sendTextToBench(songId: ID, texts: string[], sectionId: ID | 'new', kind: SectionKind = 'verse'): ID {
+/** Append text lines to the active take of a section (or a brand-new one). Returns where they went and how to take them back. */
+export function sendTextToBench(songId: ID, texts: string[], sectionId: ID | 'new', kind: SectionKind = 'verse'): { sid: ID; undo: () => void } {
   let target: ID = sectionId as ID;
+  let entryId: ID | null = null;
+  let takeId: ID | null = null;
+  let hadBlank = false;
+  const addedIds: ID[] = [];
   updateSong(songId, (d) => {
     const lines: Line[] = texts.flatMap((t) => t.split('\n')).map((t) => newLine(t.trim())).filter((l) => l.text);
+    lines.forEach((l) => addedIds.push(l.id));
     if (sectionId === 'new') {
       const s = newSection(kind, lines.length ? lines : undefined);
       d.sections.push(s);
-      d.arrangement.push({ id: uid(), sectionId: s.id });
+      const entry = { id: uid(), sectionId: s.id };
+      d.arrangement.push(entry);
+      entryId = entry.id;
       target = s.id;
       return;
     }
     const sec = d.sections.find((s) => s.id === sectionId);
     if (!sec) return;
     const take = activeTake(sec);
-    if (take.lines.length === 1 && !take.lines[0].text) take.lines.splice(0, 1);
+    takeId = take.id;
+    if (take.lines.length === 1 && !take.lines[0].text) { hadBlank = true; take.lines.splice(0, 1); }
     take.lines.push(...lines);
   });
-  return target;
+  const undo = () => updateSong(songId, (d) => {
+    if (sectionId === 'new') {
+      d.sections = d.sections.filter((s) => s.id !== target);
+      d.arrangement = d.arrangement.filter((a) => a.id !== entryId);
+      return;
+    }
+    const sec = d.sections.find((s) => s.id === sectionId);
+    const take = sec?.takes.find((t) => t.id === takeId);
+    if (!sec || !take) return;
+    take.lines = take.lines.filter((l) => !addedIds.includes(l.id));
+    if (!take.lines.length || hadBlank) take.lines.unshift(newLine());
+  });
+  return { sid: target, undo };
 }
 
 export function addTake(songId: ID, sectionId: ID, copy: boolean): void {

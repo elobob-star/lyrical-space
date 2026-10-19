@@ -84,15 +84,22 @@ function splice(s: InkState, a: number, b: number, ins: string, wet: Wet | null,
   return { text, marks, wet, caret: a + ins.length, kind };
 }
 
-/** Where a one-character backward/forward delete lands, hopping over ink that is already struck. */
-function leftTarget(marks: Mark[], from: number): number {
-  let i = from - 1;
-  while (i >= 0 && isGhostAt(marks, i)) i--;
-  return i;
+// characters are code points, not UTF-16 units: one backspace must never split an emoji
+const isHi = (c: number) => c >= 0xd800 && c <= 0xdbff;
+const isLo = (c: number) => c >= 0xdc00 && c <= 0xdfff;
+const prevLen = (text: string, i: number): number => (i >= 2 && isLo(text.charCodeAt(i - 1)) && isHi(text.charCodeAt(i - 2)) ? 2 : 1);
+const nextLen = (text: string, i: number): number => (isHi(text.charCodeAt(i)) && isLo(text.charCodeAt(i + 1)) ? 2 : 1);
+
+/** Start of the nearest unstruck character left of `from` (hopping over struck ink), or -1. */
+function leftTarget(text: string, marks: Mark[], from: number): number {
+  let i = from;
+  while (i > 0) { i -= prevLen(text, i); if (!isGhostAt(marks, i)) return i; }
+  return -1;
 }
+/** Start of the nearest unstruck character at or right of `from`, or -1. */
 function rightTarget(text: string, marks: Mark[], from: number): number {
   let i = from;
-  while (i < text.length && isGhostAt(marks, i)) i++;
+  while (i < text.length && isGhostAt(marks, i)) i += nextLen(text, i);
   return i < text.length ? i : -1;
 }
 
@@ -126,15 +133,17 @@ export function reduce(s: InkState, op: InkOp, o: InkOpts): InkResult {
       case 'back': {
         // the char just left of the caret: a real erase if it is wet, otherwise the nearest unstruck one to its left
         if (c <= 0) return same(s, c, 'noop');
-        if (!o.ghost || mayErase(wet, c - 1, c)) target = [c - 1, c];
-        else { const i = leftTarget(marks, c); target = i < 0 ? null : [i, i + 1]; }
+        const w = prevLen(text, c);
+        if (!o.ghost || mayErase(wet, c - w, c)) target = [c - w, c];
+        else { const i = leftTarget(text, marks, c); target = i < 0 ? null : [i, i + nextLen(text, i)]; }
         caretAfter = c;
         break;
       }
       case 'fwd': {
         if (c >= n) return same(s, c, 'noop');
-        if (!o.ghost || mayErase(wet, c, c + 1)) { target = [c, c + 1]; caretAfter = c; }
-        else { const i = rightTarget(text, marks, c); target = i < 0 ? null : [i, i + 1]; caretAfter = i < 0 ? n : i + 1; }
+        const w = nextLen(text, c);
+        if (!o.ghost || mayErase(wet, c, c + w)) { target = [c, c + w]; caretAfter = c; }
+        else { const i = rightTarget(text, marks, c); target = i < 0 ? null : [i, i + nextLen(text, i)]; caretAfter = i < 0 ? n : i + nextLen(text, i); }
         break;
       }
       case 'wordBack': {
@@ -167,9 +176,9 @@ export function reduce(s: InkState, op: InkOp, o: InkOpts): InkResult {
   } else if (op.t === 'gone') {
     // an IME already removed [a,b). If that was struck ink there is nothing left to strike here: hop to the nearest live char on the left
     if (o.ghost && !mayErase(wet, a, b) && Array.from({ length: b - a }, (_, k) => a + k).every((i) => isGhostAt(marks, i))) {
-      const i = leftTarget(marks, b);
+      const i = leftTarget(text, marks, b);
       if (i < 0) return same(s, b, 'noop');
-      return { text, marks: addGhosts(marks, [[i, i + 1]]), wet: null, caret: b, kind: 'strike' };
+      return { text, marks: addGhosts(marks, [[i, i + nextLen(text, i)]]), wet: null, caret: b, kind: 'strike' };
     }
   }
 
@@ -177,7 +186,8 @@ export function reduce(s: InkState, op: InkOp, o: InkOpts): InkResult {
   if (mayErase(wet, a, b)) return splice(s, a, b, '', afterErase(wet, a, b), 'erase');
   // dry ink: strike it through, never remove it
   const ghosted = addGhosts(marks, [[a, b]]);
-  const changed = ghosted.length !== marks.length || ghosted.some((m, k) => m.s !== marks[k]?.s || m.e !== marks[k]?.e);
+  const ranges = (ms: Mark[]) => ms.filter((m) => m.kind === 'ghost').map((m) => m.s + '-' + m.e).sort().join(',');
+  const changed = ranges(ghosted) !== ranges(marks);
   return { text, marks: ghosted, wet: null, caret: caretAfter, kind: changed ? 'strike' : 'noop' };
 }
 
@@ -188,6 +198,10 @@ export function reduceDiff(old: InkState, ed: Edit, nv: string, o: InkOpts): { r
     return { res, revert: res.kind === 'strike' || res.kind === 'refuse' || res.kind === 'noop' };
   }
   const added = nv.slice(ed.start, ed.start + ed.ins);
+  // an IME replaced finished words (typing over a selection, tapping a suggestion): the old words are struck, never overwritten
+  if (ed.del > 0 && (o.ghost || o.latch) && !mayErase(old.wet, ed.start, ed.start + ed.del)) {
+    return { res: reduce(old, { t: 'ins', from: ed.start, to: ed.start + ed.del, text: added }, o), revert: true };
+  }
   const res = splice(old, ed.start, ed.start + ed.del, added, afterType(nv, old.wet, ed.start, ed.del, ed.ins), 'type');
   return { res, revert: false };
 }

@@ -10,10 +10,10 @@ import { fitLine, stressToPattern } from '../engine/cadence';
 import { feel, haptic } from '../engine/feel';
 import { addTake, cutLine } from '../store/actions';
 import {
-  addLineAfter, addSection, duplicateLine, moveEntry, moveLine, removeEntry, removeLine, repeatEntry,
+  addLineAfter, addSection, duplicateLine, moveEntry, moveLine, recordArrangement, recordSection, removeEntry, removeLine, repeatEntry,
 } from '../store/lines';
 import { cmuTick, hintOnce, layer, lens, Lens, say, tray } from '../store/ui';
-import { pushUndo, undoable } from '../store/undo';
+import { undoable } from '../store/undo';
 import { UndoChip } from './UndoChip';
 import { settings } from '../store/state';
 import { Key, Keys } from './Key';
@@ -32,13 +32,7 @@ const sectionSheet = signal<ID | null>(null);
 const addSheet = signal(false);
 const takeSheet = signal<ID | null>(null);
 
-/** Snapshot one section so a take change can be undone. */
-function recordSec(song: Song, id: ID, label: string): void {
-  const sec = song.sections.find((s) => s.id === id);
-  if (!sec) return;
-  const snap = JSON.parse(JSON.stringify(sec));
-  pushUndo('bench', label, () => updateCurrent((d) => { const i = d.sections.findIndex((q) => q.id === id); if (i >= 0) d.sections[i] = snap; }));
-}
+const recordSec = (song: Song, id: ID, label: string) => recordSection(song.id, id, label);
 
 const abbrev = (_song: Song, sec: Section, names: Map<ID, string>): string => sectionAbbrev(sec, names);
 
@@ -181,6 +175,7 @@ function LineMenu() {
         <button class="choice" onClick={() => { duplicateLine(song.id, sec.id, line.id); close(); }}><span>DUPLICATE</span></button>
         <button class="choice" disabled={!line.text.trim()} onClick={() => {
           const pat = stressToPattern(info.stress);
+          recordSec(song, sec.id, 'CADENCE');
           updateCurrent((d) => { const s = d.sections.find((q) => q.id === sec.id); if (s) s.cadence = pat; });
           feel('chk', 'medium'); say('CADENCE COPIED FROM THIS LINE'); close();
         }}><span>USE AS CADENCE</span><small>measure the section against it</small></button>
@@ -207,12 +202,12 @@ function SectionSheet({ id }: { id: ID }) {
   if (!sec) return null;
   const names = sectionNames(song);
   if (rename) return <TextSheet title="RENAME SECTION" value={sec.name ?? ''} placeholder={names.get(id)} onClose={close}
-    onSave={(v) => updateCurrent((d) => { const s = d.sections.find((q) => q.id === id); if (s) { if (v.trim()) s.name = v.trim(); else delete s.name; } })} />;
+    onSave={(v) => { recordSec(song, id, 'RENAME'); updateCurrent((d) => { const s = d.sections.find((q) => q.id === id); if (s) { if (v.trim()) s.name = v.trim(); else delete s.name; } }); }} />;
   return (
     <Sheet title={names.get(id) ?? 'SECTION'} onClose={close}>
       <div class="kinds">
         {SECTION_KINDS.map((k) => (
-          <button key={k} class={'kind' + (sec.kind === k ? ' on' : '')} onClick={() => { feel('click'); recordSec(song, id, 'SECTION TYPE'); updateCurrent((d) => { const s = d.sections.find((q) => q.id === id); if (s) s.kind = k; }); }}>{k.toUpperCase()}</button>
+          <button key={k} class={'kind' + (sec.kind === k ? ' on' : '')} onClick={() => { feel('click'); if (sec.kind !== k) recordSec(song, id, 'SECTION TYPE'); updateCurrent((d) => { const s = d.sections.find((q) => q.id === id); if (s) s.kind = k; }); }}>{k.toUpperCase()}</button>
         ))}
       </div>
       <div class="choices" style={{ marginTop: '10px' }}>
@@ -286,6 +281,7 @@ function AddSheet() {
           <div class="kinds">
             {song.sections.map((s) => (
               <button key={s.id} class="kind rep" onClick={() => {
+                recordArrangement(song.id, 'REPEAT');
                 updateCurrent((d) => {
                   const i = sel ? d.arrangement.findIndex((a) => a.id === sel) : -1;
                   const entry = { id: Math.random().toString(36).slice(2, 9), sectionId: s.id };

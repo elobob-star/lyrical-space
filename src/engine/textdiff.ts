@@ -16,6 +16,8 @@ export function diffEdit(a: string, b: string, caret?: number): Edit {
     const c = caret - ins;
     if (c >= 0 && c <= a.length && a.slice(0, c) + b.slice(c, caret) + a.slice(c) === b) start = c;
   }
+  // A deletion beside an equal character is ambiguous ("bcc" → "bc"): the caret says which one went.
+  if (caret !== undefined && ins === 0 && del > 0 && caret >= 0 && caret + del <= a.length && a.slice(0, caret) + a.slice(caret + del) === b) start = caret;
   return { start, del, ins };
 }
 

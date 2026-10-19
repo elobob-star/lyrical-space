@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InkOp, InkOpts, Wet, afterType, cleanText, isGhostAt, reduce, stripGhosts } from './ink';
 import { diffEdit, rebaseMarks } from './textdiff';
+import { reduceDiff } from './ink';
 import type { Mark } from '../store/models';
 
 /** A tiny writer: a caret, some ink, and the same reducer the notebook uses. */
@@ -187,6 +188,60 @@ describe('marks keep their shape across edits', () => {
     const ed = diffEdit('abcd', 'abXcd', 3);
     expect(ed).toEqual({ start: 2, del: 0, ins: 1 });
     expect(rebaseMarks(marks, ed).filter((m) => m.kind === 'ghost').map((m) => [m.s, m.e])).toEqual([[0, 2], [3, 5]]);
+  });
+});
+
+describe('ink: IME replacements and edge cases', () => {
+  const state = (text: string, marks: Mark[] = [], wet: Wet | null = null) => ({ text, marks, wet });
+
+  it('an IME replacing finished words strikes them and writes after (never overwrites)', () => {
+    const old = state('keep these words ');
+    const nv = 'keep x words ';
+    const { res, revert } = reduceDiff(old, diffEdit(old.text, nv), nv, { ghost: true, latch: false });
+    expect(revert).toBe(true);
+    expect(res.text).toBe('keep thesex words ');
+    expect(res.marks.filter((m) => m.kind === 'ghost').map((m) => [m.s, m.e])).toEqual([[5, 10]]);
+  });
+
+  it('...but replacing the word still being typed is an ordinary edit (autocorrect)', () => {
+    const old = state('say teh', [], { s: 4, e: 7 });
+    const nv = 'say the';
+    const { res, revert } = reduceDiff(old, diffEdit(old.text, nv, 7), nv, { ghost: true, latch: false });
+    expect(revert).toBe(false);
+    expect(res.text).toBe('say the');
+    expect(res.marks).toEqual([]);
+  });
+
+  it('a latch also holds against IME replacements', () => {
+    const old = state('keep these words ');
+    const nv = 'keep x words ';
+    const { res, revert } = reduceDiff(old, diffEdit(old.text, nv), nv, { ghost: true, latch: true });
+    expect(revert).toBe(true);
+    expect(res.text).toContain('these');
+  });
+
+  it('a deletion beside an equal character is attributed by the caret', () => {
+    // "bcc" -> "bc" with the caret at 1: the FIRST c went
+    expect(diffEdit('bcc\n', 'bc\n', 1)).toEqual({ start: 1, del: 1, ins: 0 });
+    const old = state('bcc\n', [], { s: 0, e: 2 });
+    const { res } = reduceDiff(old, diffEdit('bcc\n', 'bc\n', 1), 'bc\n', { ghost: true, latch: false });
+    expect(res.kind).toBe('erase');
+  });
+
+  it('backspace removes a whole emoji, wet or dry', () => {
+    const p = new Pad().type('a😀');
+    p.back();
+    expect(p.text).toBe('a');
+    const q = new Pad().type('😀 y ');
+    q.click(2).back(); // the emoji is finished ink now: struck whole, not split
+    expect(q.text).toBe('😀 y ');
+    expect(q.ghosts()).toEqual([[0, 2]]);
+  });
+
+  it('struck ink already covering a selection is not a change (no spurious undo step)', () => {
+    const marks: Mark[] = [{ id: 'g', s: 0, e: 4, kind: 'ghost' }, { id: 'p', s: 5, e: 8, kind: 'pencil' }];
+    const r = reduce({ text: 'dead live', marks, wet: null }, { t: 'back', from: 0, to: 4 }, { ghost: true, latch: false });
+    expect(r.kind).toBe('noop');
   });
 });
 

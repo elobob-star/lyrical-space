@@ -5,12 +5,12 @@ import { currentPage, flip, hasWords, pageId, pages, pendingMarks, punchPage, tu
 import { Mark, Page, uid } from '../store/models';
 import { diffEdit, rebaseMarks } from '../engine/textdiff';
 import { InkOp, InkResult, Wet, addGhosts, cleanText, isWordCh, reduce, reduceDiff, stripGhosts } from '../engine/ink';
-import { Snap, canRedo, canUndo, openPage, record, redo as redoStep, undo as undoStep } from '../store/inkHistory';
+import { Snap, canRedo, canUndo, inkReset, openPage, record, redo as redoStep, undo as undoStep } from '../store/inkHistory';
 import { indexAtPoint } from '../engine/hit';
 import { feel, haptic, sound } from '../engine/feel';
 import { makeStrips, sendTextToBench } from '../store/actions';
 import { copyText, shareText } from '../engine/share';
-import { undoable } from '../store/undo';
+import { pushUndo, undoable } from '../store/undo';
 import { hintOnce, latch, pen, rollStats, say, sprint } from '../store/ui';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
@@ -148,6 +148,7 @@ export function RollView() {
 
   if (lastPage.current !== page.id) { lastPage.current = page.id; wet.current = null; }
   useEffect(() => { openPage(page.id); }, [page.id]);
+  useEffect(() => { wet.current = null; }, [inkReset.value]);
   useEffect(() => { const w = wet.current; if (w && w.e > live().text.length) wet.current = null; }, [text]);
   useEffect(() => { hintOnce('notebook', 'THE NOTEBOOK — JUST RAMBLE. A WORD YOU\'RE TYPING ERASES; ONCE YOU HIT SPACE IT STRIKES THROUGH'); }, []);
 
@@ -243,29 +244,6 @@ export function RollView() {
     }
   };
 
-  // ----- undo / redo -----
-  const restore = (to: Snap) => {
-    const cur = live();
-    const ed = diffEdit(cur.text, to.text);
-    const pencils = rebaseMarks(cur.marks.filter((m) => m.kind !== 'ghost'), ed);
-    wet.current = null;
-    commit(to.text, [...pencils, ...to.ghosts.map((g) => ({ ...g }))], Math.min(to.caret, to.text.length));
-  };
-  const stepBack = () => {
-    const el = ta.current;
-    const cur = snapOf(el?.selectionStart ?? live().text.length);
-    const to = undoStep(cur);
-    if (!to) { haptic('light'); return; }
-    feel('click', 'light'); restore(to);
-  };
-  const stepForward = () => {
-    const el = ta.current;
-    const cur = snapOf(el?.selectionStart ?? live().text.length);
-    const to = redoStep(cur);
-    if (!to) { haptic('light'); return; }
-    feel('click', 'light'); restore(to);
-  };
-
   /** typewriter scroll: as you write down the page it follows you, keeping the line you're on in the upper two thirds */
   const follow = () => requestAnimationFrame(() => {
     const el = ta.current, root = mirror.current, sc = scroller.current;
@@ -284,6 +262,32 @@ export function RollView() {
     const limit = sc.clientHeight * 0.62;
     if (rel > limit) sc.scrollTop += rel - limit;
   });
+
+  // ----- undo / redo -----
+  const restore = (to: Snap) => {
+    const cur = live();
+    const ed = diffEdit(cur.text, to.text);
+    const pencils = to.pencils ? to.pencils.map((m) => ({ ...m })) : rebaseMarks(cur.marks.filter((m) => m.kind !== 'ghost'), ed);
+    wet.current = null;
+    commit(to.text, [...pencils, ...to.ghosts.map((g) => ({ ...g }))], Math.min(to.caret, to.text.length));
+    follow();
+  };
+  const stepBack = () => {
+    const el = ta.current;
+    const cur = snapOf(el?.selectionStart ?? live().text.length);
+    const to = undoStep(cur);
+    if (!to) { haptic('light'); return; }
+    if (to.pencils) cur.pencils = live().marks.filter((m) => m.kind !== 'ghost').map((m) => ({ ...m }));
+    feel('click', 'light'); restore(to);
+  };
+  const stepForward = () => {
+    const el = ta.current;
+    const cur = snapOf(el?.selectionStart ?? live().text.length);
+    const to = redoStep(cur);
+    if (!to) { haptic('light'); return; }
+    if (to.pencils) cur.pencils = live().marks.filter((m) => m.kind !== 'ghost').map((m) => ({ ...m }));
+    feel('click', 'light'); restore(to);
+  };
 
   const onBeforeInput = (ev: InputEvent) => {
     if (!ev.cancelable) return;
@@ -443,6 +447,8 @@ export function RollView() {
     const t = live().text;
     const pre = !t ? '' : t.endsWith('\n\n') ? '' : t.endsWith('\n') ? '\n' : '\n\n';
     const nt = t + pre + sp + '\n';
+    record(live().id, snapOf(ta.current?.selectionStart ?? t.length), 'other');
+    wet.current = null;
     commit(nt, live().marks, nt.length);
     write((d) => { delete d.spark; });
     feel('thock');
@@ -550,20 +556,24 @@ function PageMenu() {
         <button class="choice" disabled={!clean || !song} onClick={() => {
           close();
           if (!song) return;
-          const benchBefore = JSON.parse(JSON.stringify({ sections: song.sections, arrangement: song.arrangement }));
-          sendTextToBench(song.id, clean.split('\n'), 'new', 'verse');
+          const sent = sendTextToBench(song.id, clean.split('\n'), 'new', 'verse');
           feel('thock', 'medium');
-          undoable('bench', `P.${page.n} → A NEW VERSE ON THE BENCH`, () => updateCurrent((d) => { d.sections = benchBefore.sections; d.arrangement = benchBefore.arrangement; }), undefined, 'TO THE BENCH');
+          undoable('bench', `P.${page.n} → A NEW VERSE ON THE BENCH`, sent.undo, undefined, 'TO THE BENCH');
           setMode('bench');
         }}><span>TO THE BENCH</span><small>its lines become a new verse</small></button>
         <button class="choice" disabled={!struck} onClick={() => {
           close();
           const cur = currentPage.peek();
           if (!cur) return;
-          const was: Snap = { text: cur.text, ghosts: cur.marks.filter((m) => m.kind === 'ghost').map((m) => ({ ...m })), caret: cur.text.length };
+          const was: Snap = {
+            text: cur.text, caret: cur.text.length,
+            ghosts: cur.marks.filter((m) => m.kind === 'ghost').map((m) => ({ ...m })),
+            pencils: cur.marks.filter((m) => m.kind !== 'ghost').map((m) => ({ ...m })),
+          };
           const tidy = stripGhosts(cur.text, cur.marks);
           record(cur.id, was, 'other');
           updatePage(cur.id, (d) => { d.text = tidy.text; d.marks = tidy.marks; });
+          inkReset.value++;
           feel('shuffle', 'light'); say('STRUCK-OUT WORDS BURNED — UNDO BRINGS THEM BACK');
         }}><span>BURN THE STRIKES</span><small>delete struck-out ink for good</small></button>
       </div>
@@ -656,7 +666,9 @@ export function RollKeys() {
 function layOnTable(ids: string[]): void {
   const texts = scraps.peek().filter((s) => ids.includes(s.id)).map((s) => s.text);
   if (!currentSong.peek() || !texts.length) return;
-  updateCurrent((d) => { d.table.push(...makeStrips(texts, 'roll', d.table)); });
+  const laid = new Set<string>();
+  updateCurrent((d) => { const fresh = makeStrips(texts, 'roll', d.table); fresh.forEach((f) => laid.add(f.id)); d.table.push(...fresh); });
+  pushUndo('table', 'ON TABLE', () => updateCurrent((d) => { d.table = d.table.filter((x) => !laid.has(x.id)); }));
   setMode('table');
 }
 

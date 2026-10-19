@@ -3,6 +3,7 @@ import { useRef, useState } from 'preact/hooks';
 import { ID } from '../../store/models';
 import { Beat, HOLD_MS, TapEvent, tapsToPattern } from '../../engine/cadence';
 import { currentSong, updateCurrent } from '../../store/state';
+import { recordSection } from '../../store/lines';
 import { feel, haptic, sound } from '../../engine/feel';
 import { Sheet } from '../Sheet';
 import { Icon } from '../icons';
@@ -24,6 +25,7 @@ export function CadenceSheet() {
 
   const add = (b: Beat) => { feel('click', 'light'); setPat((p) => [...p, b]); };
   const save = () => {
+    if (song && sid) recordSection(song.id, sid, 'CADENCE');
     updateCurrent((d) => { const s = d.sections.find((x) => x.id === sid); if (s) { if (pat.length) s.cadence = pat; else delete s.cadence; } });
     feel('chk', 'medium');
     close();
