@@ -40,7 +40,7 @@ One JSON object. Unknown fields must be kept by anything that rewrites the file.
 | `app` | always `"portascribe"` (the original name — kept so copies open in every build) |
 | `format` | `"foolscap-library"` |
 | `schema` | `4` |
-| `appVersion` | the app version that wrote it, e.g. `"0.5.0"` |
+| `appVersion` | the app version that wrote it, e.g. `"0.5.1"` |
 | `savedAt` | ISO time |
 | `songs` | `Song[]`, including songs in the Bin (`deletedAt` set) |
 | `pages` | `Page[]` — the notebook, ascending page numbers |

@@ -144,8 +144,11 @@
 .cutguide[data-kind='gap'] i { left: -12px; top: -22px; }
 .cutguide[data-kind='seam'] i { left: -22px; top: -12px; }
 .slash { position: absolute; left: 0; top: 0; z-index: 1100; height: 3px; margin-top: -1.5px; border-radius: 2px; pointer-events: none; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 40%, #fff); box-shadow: 0 0 10px 2px rgba(255, 79, 0, .7); }
-/* a strip offered a piece of tape, on whichever edge the other one is touching */
-.strip.tape-stack::after, .strip.tape-join::after, .strip.tape-above::after, .strip.tape-before::after { content: ''; position: absolute; z-index: 2; background: var(--clear-tape); box-shadow: var(--clear-edge), 0 0 0 1.5px rgba(255, 79, 0, .55); border-radius: .5px; animation: fadein .12s; pointer-events: none; }
+/* a strip offered a piece of tape, on whichever edge the other one is touching: a faint outline while you hold it
+   there, then the tape sticks (solid, with a buzz) — only then does letting go tape them */
+.strip.tape-stack::after, .strip.tape-join::after, .strip.tape-above::after, .strip.tape-before::after { content: ''; position: absolute; z-index: 2; background: transparent; box-shadow: 0 0 0 1px rgba(255, 79, 0, .45); border-radius: .5px; opacity: .8; animation: fadein .12s; pointer-events: none; }
+.strip.armed.tape-stack::after, .strip.armed.tape-join::after, .strip.armed.tape-above::after, .strip.armed.tape-before::after { background: var(--clear-tape); box-shadow: var(--clear-edge), 0 0 0 1.5px rgba(255, 79, 0, .8); opacity: 1; animation: tapestick .18s var(--spring-soft); }
+@keyframes tapestick { from { transform: scale(1.5); opacity: .4; } }
 .strip.tape-stack::after { left: 18%; bottom: -6px; width: 22px; height: 11px; transform: rotate(-3deg); }
 .strip.tape-above::after { left: 18%; top: -6px; width: 22px; height: 11px; transform: rotate(3deg); }
 .strip.tape-join::after { right: -6px; top: 50%; width: 11px; height: 22px; margin-top: -11px; transform: rotate(4deg); }

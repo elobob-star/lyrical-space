@@ -291,9 +291,22 @@ const A = page.locator(`.strip[data-id="${picks.a}"]`), B = page.locator(`.strip
 const ab = await A.boundingBox(), bb = await B.boundingBox();
 const nBeforeTape = await all.count();
 const grip = picks.grip;
+// let go the moment it touches: no tape, it is just laid there
 await drag(grip.x, grip.y, ab.x + 4 + grip.dx, ab.y + ab.height + grip.dy, 16);
 await wait(300);
-ok('dropping on an edge tapes the strips together', (await all.count()) === nBeforeTape - 1, `${nBeforeTape} -> ${await all.count()}`);
+ok('dropping against an edge straight away does not tape', (await all.count()) === nBeforeTape, `${nBeforeTape} -> ${await all.count()}`);
+// pick it up again, hold it against the edge a moment: the tape sticks, let go
+{
+  const b2 = await B.boundingBox();
+  const gx = b2.x + grip.dx, gy = b2.y + grip.dy;
+  await page.mouse.move(gx, gy); await page.mouse.down();
+  await page.mouse.move(gx + 30, gy + 60, { steps: 6 }); // off the edge first
+  await page.mouse.move(ab.x + 4 + grip.dx, ab.y + ab.height + grip.dy, { steps: 10 });
+  await wait(450);
+  const armed = await A.evaluate((el) => el.classList.contains('armed'));
+  await page.mouse.up(); await wait(300);
+  ok('holding a strip against an edge for a moment makes the tape stick', armed && (await all.count()) === nBeforeTape - 1, `${armed} ${nBeforeTape} -> ${await all.count()}`);
+}
 ok('the joint shows a bit of clear tape', (await page.locator('.strip .hseam.taped').count()) >= 1);
 await shot('22-table-taped');
 // cut-up + undo from the LCD

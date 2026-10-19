@@ -160,9 +160,12 @@ Keys: **SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP · UNDO**
   * the two pieces start where they were cut and slide apart.
 * A picked-up strip also gets a small bar: EDIT · BENCH · ⋯ · throw away. **⋯** holds DUPLICATE, SPLIT INTO WORDS,
   SPLIT INTO LINES and KEEP IN THE SHOEBOX.
-* **Push a strip against any edge of another** → taped: under it or on top (two lines), after it or in front (one line).
-  A bit of clear tape previews on that edge while you hover. Joints keep a small see-through piece of tape; snipping a
-  joint peels it.
+* **Hold a strip against any edge of another for a moment** → taped: under it or on top (two lines), after it or in
+  front (one line). Tape is never an accident: the edges have to nearly touch (within 14 px) and overlap well; a faint
+  outline shows on that edge, and after ~0.3 s the tape sticks (solid, with a buzz) — only then does letting go tape
+  them. Drop it straight away, or slide on past, and it is just paper laid nearby. The two halves of a fresh cut never
+  stick back together by themselves: an edge a strip was already touching when picked up is ignored until it has left it.
+  Joints keep a small see-through piece of tape; snipping a joint peels it.
 * **Double-tap the mat** → a new slip right there. **SLIP** does the same in a free spot.
 * **DEAL** — four scraps from the Shoebox. **CUT-UP** — slices every strip into 2–4-word fragments (Burroughs/Bowie). **SHUFFLE** — re-scatters (FLIP animation). **SWEEP** — clears the mat; typed and taped work is kept in the Shoebox, copies are just cleared.
 * **UNDO** — a key on the row, awake whenever there is something to take back; the LCD offers it right after an action
