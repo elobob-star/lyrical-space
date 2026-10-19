@@ -8,7 +8,7 @@ export function UndoChip({ surface }: { surface: Surface }) {
   if (!n) return null;
   return (
     <button class="undo-chip" aria-label="Undo" onMouseDown={(e) => e.preventDefault()} onClick={() => { feel('click', 'light'); runUndo(surface); }}>
-      <Icon n="undo" size={14} stroke={2.2} /><span>UNDO</span>{n > 1 && <b>{n}</b>}
+      <Icon n="undo" size={15} stroke={2} />{n > 1 && <b>{n}</b>}
     </button>
   );
 }

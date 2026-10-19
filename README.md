@@ -1,17 +1,21 @@
 # FOOLSCAP
 
-The notebook-first successor to Portascribe MK-I (it installs as its own app, `dev.foolscap.app`, so both can sit side by side; use BACKUP ALL → RESTORE to carry writing across, either way). A lyric notepad that behaves like a piece of studio hardware — a matte, Teenage-Engineering-style machine
+The notebook-first successor to Portascribe MK-I (it installs as its own app, `dev.foolscap.app`, so both can sit side by side; use SAVE A COPY → OPEN A COPY to carry writing across, either way). A lyric notepad that behaves like a piece of studio hardware — a matte, Teenage-Engineering-style machine
 wrapped around warm, imperfect paper. Built to beat perfectionism, not to write for you.
 
 | Dial | Surface | Keys | Borrowed from |
 |---|---|---|---|
 | **NOTEBOOK** | a yellow legal pad of dated pages that belongs to no song — the app opens here | LATCH · PEN · DRAW · PUNCH · SPRINT | Dylan / Waits: just ramble. A fresh page after a break, old pages a flip back. The word you're typing erases; once you hit space, backspace strikes it through. UNDO when you want it. LATCH = forward only. PEN taps the gems, PUNCH files them into the shoebox. |
-| **TABLE** | a cutting mat with paper strips | SLIP · DEAL · SNIP · CUT-UP · SHUFFLE · SWEEP | Bowie / Burroughs / Waits: hold a strip (or pick up the scissors) and let go where the guide says to cut, slash across the mat to cut several, drop one on another's edge to tape, deal scraps from the shoebox, cut everything up. |
+| **TABLE** | a cutting mat with paper strips | SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP · UNDO | Bowie / Burroughs / Waits: tap a strip and tap where to cut (or slide to it), slash across the mat to cut several, push one against any edge of another to tape, let paper hang off the mat, deal scraps from the shoebox, cut everything up. |
 | **BENCH** | ruled index cards | WORDS · CHORDS · LENS · SHOEBOX · STAND | Cohen / Nick Drake: sections and takes, chord stamps, rhyme & meter lenses, hold-to-hum per card, tuning/capo/tempo, a scratch tape, and a music stand that scrolls at tempo. |
 
 **⏏ TAPES** opens the rack: cassette J-cards, the **Shoebox** (one pile for every stray line), the bin, tape history,
 **PASTE IN** (plain lyrics, chords-over-lyrics or ChordPro). **SETUP** is the gear at the end of the LCD — one tap from anywhere. The **CATCH** slip on the right edge files a
 line into the shoebox while you're working on a song. The **LCD** is the machine's only voice — tap it to UNDO or follow a hint.
+
+**Your words outlive the app**: Setup › LIBRARY › CHOOSE A FOLDER keeps everything in a folder you pick, as plain files
+(the format is [`docs/FORMAT.md`](docs/FORMAT.md)). Delete the app, install it again — or any later version — choose the
+same folder, and it all comes back. On iPhone (Safari) it's SAVE A COPY instead.
 
 Offline-first, no accounts, **no API keys**, no AI. Rhymes, syllables and stress come from a bundled CMU dictionary;
 Datamuse and the Free Dictionary API are optional extras.

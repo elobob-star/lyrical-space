@@ -40,8 +40,13 @@ Open it once while online and wait a few seconds: the dictionary is cached and f
 * Everyone's writing lives **only on their own phone** — a friend gets their own empty notebook, you never see theirs and they never see yours.
   There is no account and no sync.
 * No haptic buzz on iPhone web apps (Safari has no vibration API); sounds start after the first tap and follow the silent switch; "keep screen on" needs iOS 16.4+.
-* Storage is separate from Safari's own tabs and from the native app — use **Setup → BACKUP ALL** before deleting the icon.
-  The backup file opens in every Foolscap (and the old Portascribe MK-I), so it also moves your notebook to a new phone.
+* **Add it to the Home Screen before writing in it.** The home-screen app keeps its own storage, separate from Safari's
+  tabs: anything written in a plain Safari tab stays in that tab and doesn't move into the icon.
+* Deleting the icon deletes what's in it. Safari can't keep a folder up to date, so use **Setup › LIBRARY › SAVE A COPY**
+  now and then (Save to Files / iCloud Drive) — the app reminds you at most once a week. On a new install the first page
+  offers **OPEN A COPY**, and everything comes back. The copy opens in every Foolscap (and the old Portascribe MK-I), so it
+  also moves a notebook to a new phone.
+* Keep using the same link: the notebook belongs to that address, so a different address starts an empty one.
 
 ## B. The real app, sideloaded for free
 

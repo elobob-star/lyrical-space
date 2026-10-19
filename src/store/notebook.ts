@@ -1,7 +1,7 @@
 // The notebook: pages of rambling that belong to no song. It is the home surface.
 import { computed, effect, signal } from '@preact/signals';
 import { produce } from 'immer';
-import { dbAll, dbPut, kvGet, kvSet } from './db';
+import { dbAll, dbDelete, dbPut, kvGet, kvSet } from './db';
 import { ID, Mark, Page, Song, uid } from './models';
 import { cleanRange, tidyPhrase } from './actions';
 import { addScrap } from './state';
@@ -132,6 +132,30 @@ export async function loadNotebook(songs: Song[], freshInstall: boolean): Promis
 /** set by the UI to say something when a fresh page appears on return */
 export let onFreshPage: (() => void) | null = null;
 export function setOnFreshPage(f: () => void): void { onFreshPage = f; }
+
+/**
+ * Pages picked up from a folder: matched by id, the newer one wins; pages new to this notebook go after the last one.
+ * `replace` (a fresh install): the incoming notebook simply becomes this one, numbers and all.
+ */
+export function upsertPages(incoming: Page[], replace: boolean): number {
+  if (replace) {
+    if (!incoming.length) return 0;
+    for (const p of pages.peek()) if (!incoming.some((x) => x.id === p.id)) { saved.delete(p.id); void dbDelete('pages', p.id); }
+    pages.value = [...incoming].sort((a, b) => a.n - b.n);
+    pageId.value = latestPage.peek()?.id ?? null;
+    ensureFreshPage();
+    return incoming.length;
+  }
+  let changed = 0;
+  const list = pages.peek().map((p) => {
+    const inc = incoming.find((x) => x.id === p.id);
+    if (!inc || (inc.updatedAt ?? 0) <= p.updatedAt) return p;
+    changed++;
+    return { ...inc, n: p.n };
+  });
+  if (changed) pages.value = list;
+  return changed + mergePages(incoming);
+}
 
 export function mergePages(incoming: Page[]): number {
   const known = new Set(pages.peek().map((p) => p.id));

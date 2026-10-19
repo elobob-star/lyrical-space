@@ -4,7 +4,7 @@ import { Icon } from './icons';
 import { Key } from './Key';
 import { currentSong, liveSongs, mode, scraps, settings, songs, Mode } from '../store/state';
 import { currentPage, pages } from '../store/notebook';
-import { cutting, dismissMsg, layer, latch, lcdMsg, lens, pen, rackTab, sprint } from '../store/ui';
+import { dismissMsg, layer, latch, lcdMsg, lens, pen, rackTab, sprint } from '../store/ui';
 import { recLevel, recording } from '../engine/recorder';
 import { feel } from '../engine/feel';
 import { sectionAbbrev, sectionNames } from '../store/models';
@@ -97,7 +97,7 @@ function Readout() {
     body = <span class="dim">NO TAPE</span>;
   } else if (m === 'table') {
     const n = song.table.length;
-    body = <><span class="msgwin">{song.title}</span>{cutting.value && <span class="hot">SNIP</span>}<span class="hot">{String(n).padStart(2, '0')}</span></>;
+    body = <><span class="msgwin">{song.title}</span><span class="hot">{String(n).padStart(2, '0')}</span></>;
   } else {
     const names = sectionNames(song);
     const map = song.arrangement.map((a) => { const s = song.sections.find((x) => x.id === a.sectionId); return s ? sectionAbbrev(s, names) : ''; }).join(' ');

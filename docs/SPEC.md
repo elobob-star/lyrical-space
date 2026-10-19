@@ -144,18 +144,30 @@ Keys: **LATCH · PEN · DRAW · PUNCH · SPRINT**
 
 ### 4.2 TABLE — cut & recombine
 
-Keys: **SLIP · DEAL · SNIP · CUT-UP · SHUFFLE · SWEEP**
+Keys: **SLIP · DEAL · CUT-UP · SHUFFLE · SWEEP · UNDO**
 
-* Strips are dragged freely (velocity tilt) and stay on the mat. Shadows are plain boxes, not filters, and tapping a strip writes nothing to the song — that is what keeps it quick on a phone.
-* **Cutting never asks for precision.** Every place a strip can be cut — a gap between words, or the seam between two lines — is a candidate; you aim at the nearest one and a guide (dashed line + scissors) shows where the cut will fall:
-  * **hold** a strip, or switch the scissors on with **SNIP**, then press anywhere on it, slide to re-aim, **let go to cut**. In SNIP mode a plain press cuts at the nearest gap;
-  * **slash** across the mat (start on bare mat) to cut every strip the stroke crosses — vertical strokes cut between words, horizontal ones between lines;
+* Strips are dragged freely (velocity tilt). Paper may **hang off any edge of the mat** — only enough to grab it again
+  (56 px across, 30 px down) has to stay on — so two wide strips can still be laid side by side and taped. New strips land
+  wholly on the mat. Shadows are plain boxes, not filters, and tapping a strip writes nothing to the song — that is what
+  keeps it quick on a phone.
+* **Cutting has no tool to pick up or put down.** **Tap** a strip and its scissors come out: every place it can be cut —
+  a gap between words, or the seam between two lines — shows as a dashed line.
+  * **tap a dashed line** to cut there (a tap within reach of one is enough), or **press and slide** along the strip: a
+    guide (dashed line + scissors) follows the finger to the nearest cut; **let go** to cut;
+  * pulled off its own paper, a picked-up strip simply moves instead; a tap away from any cut puts it down;
+  * **slash** across the mat (start on bare mat) to cut every strip the stroke crosses — vertical strokes cut between
+    words, horizontal ones between lines;
   * the two pieces start where they were cut and slide apart.
-* **Tap** a strip to pick it up: EDIT · SNIP · BENCH · ⋯ · throw away. **⋯** holds DUPLICATE, SPLIT INTO WORDS, SPLIT INTO LINES and KEEP IN THE SHOEBOX.
-* **Drop a strip on another's bottom edge** → taped underneath (two lines); **on its right edge** → taped end to end. A piece of tape previews while you hover. Joints show the tape; snipping a joint peels it.
+* A picked-up strip also gets a small bar: EDIT · BENCH · ⋯ · throw away. **⋯** holds DUPLICATE, SPLIT INTO WORDS,
+  SPLIT INTO LINES and KEEP IN THE SHOEBOX.
+* **Push a strip against any edge of another** → taped: under it or on top (two lines), after it or in front (one line).
+  A bit of clear tape previews on that edge while you hover. Joints keep a small see-through piece of tape; snipping a
+  joint peels it.
 * **Double-tap the mat** → a new slip right there. **SLIP** does the same in a free spot.
 * **DEAL** — four scraps from the Shoebox. **CUT-UP** — slices every strip into 2–4-word fragments (Burroughs/Bowie). **SHUFFLE** — re-scatters (FLIP animation). **SWEEP** — clears the mat; typed and taped work is kept in the Shoebox, copies are just cleared.
-* **UNDO** — a chip appears on the mat whenever there is something to take back (moves included, counted when there are several); the LCD offers it too.
+* **UNDO** — a key on the row, awake whenever there is something to take back; the LCD offers it right after an action
+  too. It takes back what you can't easily redo by hand — cuts, tape, throwing away, edits, splits, a deal, a cut-up, a
+  shuffle, a sweep — and never a move. Taking back a cut leaves every strip where you have pushed it since.
 * **→ BENCH** slots a strip into a section (or a new verse/chorus/bridge).
 
 ### 4.3 BENCH — the song
@@ -200,7 +212,8 @@ The whole arrangement on one lead sheet in the current paper stock, chords hung 
 * **Stress** — per syllable (`S` primary, `s` secondary, `u` none); one-syllable function words `u`, content words `S`. Per-word overrides keyed `${index}:${word}` so they fall away when the word changes.
 * **Rhyme** — key from the last stressed vowel; slant key = stressed vowel. Flow analysis groups perfect rhymes (≥ 2 distinct words) then slant end-rhymes; scheme letters come from the end-word groups.
 * **Ghost ink** — `marks {s,e,kind:'ghost'|'pencil',punched?}` re-based on every edit (diff of common prefix/suffix); a ghost mark is *split* around an edit inside it, a pencil mark stretches. The decision "erase or strike?" is a pure reducer (`reduce` / `reduceDiff`): `beforeinput` feeds it where the event is cancelable, and the post-hoc diff feeds it when an IME already changed the text. Handlers read live store state, never the render closure (several input events can arrive between renders).
-* **Undo** — the notebook keeps snapshots per page (text + struck ink, bursts coalesced); Table and Bench keep a LIFO stack per song and surface (`store/undo.ts`) whose entries are inverse operations (snapshots of the strips, of a take's lines, of the arrangement, of key/capo/tuning/tempo).
+* **Undo** — the notebook keeps snapshots per page (text + struck ink, bursts coalesced); Table and Bench keep a LIFO stack per song and surface (`store/undo.ts`) whose entries are inverse operations (on the Table: what a change added, took away or rewrote, by strip id — positions are left alone; on the Bench: a take's lines, the arrangement, key/capo/tuning/tempo). Moves — of strips, lines, sections, chord stamps — are not undo steps. On the Bench the undo is a small inked arrow beside the title, only there when there is something to take back.
+* **The folder** — Setup › LIBRARY › CHOOSE A FOLDER mirrors everything into a folder of the writer's choosing as plain files (`foolscap-library.json`, a dated copy per day, a text file per page and per song, the shoebox, voice memos) a few seconds after each change. On Android it is a Storage Access Framework folder with a lasting permission (`FolderPlugin.java`); in Chrome, File System Access. A fresh install offers "BEEN HERE BEFORE?" on the first page: choosing the folder picks everything up (matched by id, newest wins, nothing doubled). Where neither exists (Safari on iPhone), SAVE A COPY / OPEN A COPY, with a gentle weekly reminder. The file format is the contract in [`FORMAT.md`](FORMAT.md).
 * **Importer** — two passes: rows → blocks (headers, directives, chord lines → column-anchored chords, inline `[C]`), then blocks → sections + arrangement.
 * **Cut-up** — 2–4-word fragments, never leaving a single word at the end.
 
@@ -243,8 +256,8 @@ The three surfaces are panes on one "desk"; the outgoing pane stays mounted for 
 ## 9. Verification
 
 * `npm test` — engine unit tests (dictionary, syllables, stress, rhyme, scheme, diff/rebase, cadence, music, transpose, importer, meter overrides, migration, export).
-* `scripts/e2e/flows.mjs` — ~90 interactions at phone size: typo grace, ghost ink, typing inside struck ink, notebook undo/redo, latch & bail, draw, pen tap/drag, punch → table, deal, drag, hold-to-cut, SNIP, slash, split into words, UNDO chip, tape, cut-up + LCD undo, shuffle, sweep + undo, double-tap slip, slot to bench, split/merge, chord drag, swipe → shoebox, shoebox drawer, words swap, tabs, both lenses + meter override, transpose, stand auto-scroll, catch, rack shoebox, history, paste-in import, finish switch.
-* `scripts/e2e/undo.mjs` (notebook strikes, burn, page menu; bench typing / Enter / move / tempo undo; the LCD gear), `persist.mjs` (production bundle), `upgrade.mjs` (an MK-I/MK-II database opened by this build: rolls → pages, bones → shoebox, migration runs once), `perf.mjs` (4× CPU throttle), `tour.mjs` / `sheets.mjs` (screenshots).
+* `scripts/e2e/flows.mjs` — ~90 interactions at phone size: typo grace, ghost ink, typing inside struck ink, notebook undo/redo, latch & bail, draw, pen tap/drag, punch → table, deal, drag, tap-to-cut and slide-to-cut on a picked-up strip, slash, split into words, the UNDO key, tape, cut-up + LCD undo, shuffle, sweep + undo, double-tap slip, slot to bench, split/merge, chord drag, swipe → shoebox, shoebox drawer, words swap, tabs, both lenses + meter override, transpose, stand auto-scroll, catch, rack shoebox, history, paste-in import, finish switch.
+* `scripts/e2e/undo.mjs` (notebook strikes, burn, page menu; bench typing / Enter / tempo undo, moves are not undo steps; the LCD gear), `folder.mjs` (link a folder, write, wipe the app's storage, pick the folder up again), `two-phones.mjs` (two people on one link each keep their own notebook; nothing typed leaves the phone), `persist.mjs` (production bundle), `upgrade.mjs` (an MK-I/MK-II database opened by this build: rolls → pages, bones → shoebox, migration runs once), `perf.mjs` (4× CPU throttle), `tour.mjs` / `sheets.mjs` (screenshots).
 
 ## 10. Roadmap
 

@@ -4,14 +4,13 @@ import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 import { addScrap, currentSong, drawScraps, removeScrap, updateCurrent } from '../store/state';
 import { ID, SectionKind, Strip, sectionNames, uid } from '../store/models';
 import { feel, haptic, sound } from '../engine/feel';
-import { freeSpot, makeStrips, sendTextToBench } from '../store/actions';
-import { cutUp, piecesOf, snip, tape, TapeHow } from '../store/strips';
-import { cutting, hintOnce, say } from '../store/ui';
-import { pushUndo, undoable } from '../store/undo';
+import { fitX, freeSpot, makeStrips, sendTextToBench } from '../store/actions';
+import { cutUp, piecesOf, snip, tape } from '../store/strips';
+import { hintOnce, say, useBackClose } from '../store/ui';
+import { pushUndo, runUndo, undoable, undoDepth } from '../store/undo';
 import { Key, Keys } from './Key';
 import { Icon } from './icons';
 import { Choices, Sheet, TextSheet } from './Sheet';
-import { UndoChip } from './UndoChip';
 import { setMode } from './Bezel';
 
 const selected = signal<ID | null>(null);
@@ -38,10 +37,34 @@ function edges(id: string): string {
 }
 
 const snapshot = () => JSON.parse(JSON.stringify(currentSong.peek()?.table ?? [])) as Strip[];
-const restore = (t: Strip[]) => updateCurrent((d) => { d.table = t; });
 const topZ = (t: Strip[]) => Math.max(0, ...t.map((x) => x.z)) + 1;
-const clampX = (v: number) => Math.max(-0.1, Math.min(0.92, v));
-const clampY = (v: number) => Math.max(-0.02, Math.min(0.95, v));
+// paper may hang off the edge of the mat, as long as enough of it stays on to pick it up again
+const clampX = (v: number) => Math.max(-0.5, Math.min(0.86, v));
+const clampY = (v: number) => Math.max(-0.04, Math.min(0.94, v));
+/** how much of a strip must stay on the mat (px) */
+const KEEP_X = 56, KEEP_Y = 30;
+
+/**
+ * The undo for a change to the paper (a cut, tape, a throw-away, an edit…): take away what it added, put back what it
+ * took away, restore the words it changed. Where strips have been pushed around since is left alone — moving paper
+ * is never undone, it is just as easy to move it back by hand.
+ */
+function paperUndo(before: Strip[], o: { place?: boolean } = {}): () => void {
+  const after = snapshot();
+  const B = new Map(before.map((s) => [s.id, s])), A = new Map(after.map((s) => [s.id, s]));
+  const same = (a: Strip, b: Strip) => a.text === b.text && a.from === b.from && String(a.joints ?? []) === String(b.joints ?? []);
+  return () => updateCurrent((d) => {
+    d.table = d.table.filter((s) => B.has(s.id) || !A.has(s.id));
+    for (const s of d.table) {
+      const b = B.get(s.id), a = A.get(s.id);
+      if (!b || !a) continue;
+      if (!same(a, b)) { s.text = b.text; s.from = b.from; if (b.joints) s.joints = [...b.joints]; else delete s.joints; }
+      if (o.place) { s.x = b.x; s.y = b.y; s.rot = b.rot; }
+    }
+    let z = topZ(d.table);
+    for (const b of before) if (!A.has(b.id) && !d.table.some((s) => s.id === b.id)) d.table.push({ ...JSON.parse(JSON.stringify(b)), z: z++ });
+  });
+}
 
 function land(strips: Strip[]): void {
   strips.forEach((s, i) => arrival.set(s.id, i * 70));
@@ -59,7 +82,7 @@ export function deal(n = 4): number {
     land(fresh);
     d.table.push(...fresh);
   });
-  pushUndo('table', 'DEAL', () => restore(before));
+  pushUndo('table', 'DEAL', paperUndo(before));
   return picks.length;
 }
 
@@ -88,7 +111,8 @@ function StripBody({ s }: { s: Strip }) {
 
 // ---------------------------------------------------------------------------------------------------------------
 // Cutting: every place a strip can be cut is a "candidate" (a gap between words, or the seam between two lines).
-// Pressing anywhere on a strip aims at the nearest one; sliding re-aims; letting go cuts. Nothing needs precise tapping.
+// Tap a strip and its scissors come out: the candidates show as dashed lines. Tap one to cut there, or press, slide along
+// the strip to the place you want and let go. Drag it off its own paper and it simply moves. No tool to pick up or put down.
 // ---------------------------------------------------------------------------------------------------------------
 interface Cand {
   at: number; kind: 'gap' | 'seam';
@@ -149,17 +173,20 @@ function clipSeg(x0: number, y0: number, x1: number, y1: number, r: DOMRect, pad
   return [x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy];
 }
 
+/** where the dragged strip gets taped onto the other one: underneath it, after it, on top of it, in front of it */
+type Side = 'stack' | 'join' | 'above' | 'before';
 interface Drag {
-  id: ID; pid: number; el: HTMLElement; hit: HTMLElement; px: number; py: number; cx: number; cy: number;
-  ox: number; oy: number; rot: number; moved: boolean; dead: boolean; hold?: number;
+  id: ID; pid: number; el: HTMLElement; px: number; py: number;
+  ox: number; oy: number; rot: number; moved: boolean;
   nx: number; ny: number; lx: number; lt: number; tilt: number; r0: DOMRect;
-  others: Array<{ id: ID; el: HTMLElement; r: DOMRect }> | null; target: { id: ID; el: HTMLElement; how: TapeHow } | null;
-  aim: { cands: Cand[]; cur: Cand | null } | null;
+  others: Array<{ id: ID; el: HTMLElement; r: DOMRect }> | null; target: { id: ID; el: HTMLElement; how: Side } | null;
+  aim: { cands: Cand[]; cur: Cand | null; x0: number; y0: number; slid: boolean } | null;
 }
 interface Slash { pid: number; x0: number; y0: number; x1: number; y1: number; on: boolean }
 interface Ctl { down: (e: PointerEvent, s: Strip) => void; move: (e: PointerEvent) => void; up: (e: PointerEvent, s: Strip) => void; cancel: (e?: PointerEvent) => void }
 
-const HOLD_MS = 330;
+/** how close (px) a tap must land to a cut for it to count */
+const REACH = 26;
 /** a long press must not open the system's context menu — it would cancel the touch the scissors are riding on */
 const noMenu = (e: Event) => e.preventDefault();
 
@@ -185,21 +212,43 @@ export function TableView() {
   const sheet = sheetState.value;
   const sel = selected.value;
   const act = active.value;
-  const cut = cutting.value;
 
   useEffect(() => {
     const el = board.current!;
-    const ro = new ResizeObserver(() => { size.current = { w: el.clientWidth, h: el.clientHeight }; });
+    const ro = new ResizeObserver(() => { size.current = { w: el.clientWidth, h: el.clientHeight }; rescue(); });
     ro.observe(el);
     size.current = { w: el.clientWidth, h: el.clientHeight };
-    hintOnce('table-cut', 'THE TABLE — DRAG A STRIP · HOLD IT TO CUT · SLASH ACROSS THE MAT TO CUT SEVERAL · DROP ONE ON ANOTHER\'S EDGE TO TAPE');
+    hintOnce('table-cut-2', 'THE TABLE — DRAG A STRIP TO MOVE IT · TAP IT FOR THE SCISSORS · PUSH ONE AGAINST ANOTHER TO TAPE THEM');
     return () => ro.disconnect();
   }, []);
-  useEffect(() => () => { selected.value = null; cutting.value = false; }, []);
+  useEffect(() => () => { selected.value = null; }, []);
+  // the back button puts a picked-up strip down before it leaves the Table
+  useBackClose(!!sel, () => { selected.value = null; });
+
+  /** paper that ended up (almost) off the mat — a smaller screen, a rotated phone — is slid back far enough to grab */
+  const rescue = () => {
+    const b = board.current;
+    if (!b || g.current) return;
+    const br = b.getBoundingClientRect();
+    if (!br.width || !br.height) return;
+    const fix = new Map<ID, { x: number; y: number }>();
+    b.querySelectorAll<HTMLElement>('.strip').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const s = currentSong.peek()?.table.find((x) => x.id === el.dataset.id);
+      if (!s) return;
+      const visW = Math.min(r.right, br.right) - Math.max(r.left, br.left), visH = Math.min(r.bottom, br.bottom) - Math.max(r.top, br.top);
+      if (visW >= Math.min(KEEP_X, r.width) - 1 && visH >= Math.min(KEEP_Y, r.height) - 1) return;
+      const x = Math.max(-(r.width - KEEP_X) / br.width, Math.min((br.width - KEEP_X) / br.width, s.x));
+      const y = Math.max(-(r.height - KEEP_Y) / br.height, Math.min((br.height - KEEP_Y) / br.height, s.y));
+      fix.set(s.id, { x, y });
+    });
+    if (fix.size) updateCurrent((d) => { for (const t of d.table) { const f = fix.get(t.id); if (f) { t.x = f.x; t.y = f.y; } } });
+  };
+  useLayoutEffect(rescue, [song.id]);
 
   const g = useRef<Drag | null>(null);
   const sl = useRef<Slash | null>(null);
-  const clearTarget = (d: Drag) => { d.target?.el.classList.remove('tape-stack', 'tape-join'); d.target = null; };
+  const clearTarget = (d: Drag) => { d.target?.el.classList.remove('tape-stack', 'tape-join', 'tape-above', 'tape-before'); d.target = null; };
 
   // ---- the guide: a dashed line (and a pair of scissors) showing exactly where the cut will fall ----
   const placeGuide = (c: Cand) => {
@@ -218,23 +267,27 @@ export function TableView() {
   };
   const hideGuide = () => { if (guide.current) guide.current.hidden = true; };
 
-  const beginAim = (d: Drag, x: number, y: number) => {
+  /** a press on a strip whose scissors are out: the cut nearest the finger lights up */
+  const beginAim = (d: Drag, x: number, y: number): boolean => {
     const cands = candidates(d.el);
-    if (!cands.length) { d.dead = true; say('ONE WORD — NOTHING TO CUT'); feel('thud', 'light'); return; }
-    d.aim = { cands, cur: null };
+    if (!cands.length) return false;
+    d.aim = { cands, cur: null, x0: x, y0: y, slid: false };
     active.value = { id: d.id, kind: 'aim' };
-    haptic('medium');
     aimMove(d, x, y, true);
+    return true;
   };
   const aimMove = (d: Drag, x: number, y: number, first = false) => {
-    if (!d.aim) return;
-    const hit = aimAt(d.aim.cands, x, y);
-    if (!hit || hit.c === d.aim.cur) return;
-    d.aim.cur = hit.c;
-    placeGuide(hit.c);
-    if (!first) haptic('light');
+    const a = d.aim;
+    if (!a) return;
+    if (!a.slid && Math.hypot(x - a.x0, y - a.y0) > 6) a.slid = true;
+    // a tap has to land near a cut; once you slide, the nearest cut follows the finger wherever it is on the paper
+    const hit = aimAt(a.cands, x, y);
+    const c = hit && (a.slid || hit.d <= REACH) ? hit.c : null;
+    if (c === a.cur) return;
+    a.cur = c;
+    if (c) { placeGuide(c); haptic(first ? 'medium' : 'light'); } else hideGuide();
   };
-  const endAim = (d: Drag) => { hideGuide(); if (active.peek()?.id === d.id && active.peek()?.kind === 'aim') active.value = null; };
+  const endAim = (d: Drag) => { d.aim = null; hideGuide(); if (active.peek()?.id === d.id && active.peek()?.kind === 'aim') active.value = null; };
 
   /** Cut each strip at the chosen place. One UNDO takes back the lot. */
   const doCut = (items: Array<{ id: ID; cand: Cand }>): boolean => {
@@ -258,7 +311,7 @@ export function TableView() {
         const [ldx, ldy, rdx, rdy] = seam ? [0, -2, 0, 8] : [-3, 0, 8, 3];
         t.text = parts[0].text; t.joints = parts[0].joints;
         if (!t.joints.length && t.from === 'splice') t.from = 'typed';
-        t.x = clampX(t.x + ldx / W); t.y = clampY(t.y + ldy / H);
+        t.x = t.x + ldx / W; t.y = t.y + ldy / H;
         const nid = uid();
         d.table.push({
           id: nid, text: parts[1].text, joints: parts[1].joints, from: parts[1].joints.length ? 'splice' : orig === 'splice' ? 'typed' : orig,
@@ -271,7 +324,7 @@ export function TableView() {
     if (!n) return false;
     selected.value = null;
     feel('snip', 'medium');
-    undoable('table', n > 1 ? `SNIP ×${n}` : 'SNIP', () => restore(before), 2200);
+    undoable('table', n > 1 ? `SNIP ×${n}` : 'SNIP', paperUndo(before), 2200);
     // the pieces start where they were cut and slide apart
     requestAnimationFrame(() => requestAnimationFrame(() => {
       for (const { id, dx, dy } of nudges) {
@@ -288,34 +341,38 @@ export function TableView() {
   const onDown = (e: PointerEvent, s: Strip) => {
     if (g.current) { if (g.current.pid !== e.pointerId) return; cancelDrag(); } // a second finger is ignored; a lost gesture is cleaned up
     const el = e.currentTarget as HTMLElement;
-    const hit = e.target as HTMLElement; // remember before capture retargets the pointer
     try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const d: Drag = {
-      id: s.id, pid: e.pointerId, el, hit, px: e.clientX, py: e.clientY, cx: e.clientX, cy: e.clientY, ox: s.x, oy: s.y, rot: s.rot, moved: false, dead: false,
+      id: s.id, pid: e.pointerId, el, px: e.clientX, py: e.clientY, ox: s.x, oy: s.y, rot: s.rot, moved: false,
       nx: s.x, ny: s.y, lx: e.clientX, lt: performance.now(), tilt: 0, r0: el.getBoundingClientRect(), others: null, target: null, aim: null,
     };
     g.current = d;
-    if (cutting.value) { beginAim(d, e.clientX, e.clientY); return; }
-    // hold still and the scissors come out
-    d.hold = window.setTimeout(() => { if (g.current === d && !d.moved && !d.aim && !d.dead) beginAim(d, d.cx, d.cy); }, HOLD_MS);
+    if (selected.peek() === s.id) beginAim(d, e.clientX, e.clientY);
   };
   const onMove = (e: PointerEvent) => {
     const d = g.current;
-    if (!d || d.dead || e.pointerId !== d.pid) return;
-    d.cx = e.clientX; d.cy = e.clientY;
-    if (d.aim) { aimMove(d, e.clientX, e.clientY); return; }
+    if (!d || e.pointerId !== d.pid) return;
+    if (d.aim) {
+      // still on the paper: choosing where to cut · pulled well off it: the strip comes along instead
+      const r = d.r0, m = 12;
+      if (e.clientX > r.left - m && e.clientX < r.right + m && e.clientY > r.top - m && e.clientY < r.bottom + m) { aimMove(d, e.clientX, e.clientY); return; }
+      endAim(d);
+      d.el.style.transition = 'transform .12s ease-out';
+      setTimeout(() => { d.el.style.transition = ''; }, 130);
+    }
     let dx = e.clientX - d.px, dy = e.clientY - d.py;
     if (!d.moved && Math.hypot(dx, dy) < 5) return;
     if (!d.moved) {
-      d.moved = true; clearTimeout(d.hold); haptic('light');
+      d.moved = true; haptic('light');
       if (selected.value) selected.value = null;
       d.others = [...board.current!.querySelectorAll<HTMLElement>('.strip')].filter((x) => x.dataset.id !== d.id).map((x) => ({ id: x.dataset.id!, el: x, r: x.getBoundingClientRect() }));
       active.value = { id: d.id, kind: 'drag' };
     }
     const { w, h } = size.current;
-    // the strip stays on the mat: its whole width and height, not just its corner
-    const maxX = Math.max(d.ox, 1 - d.r0.width / w), maxY = Math.max(d.oy, 1 - d.r0.height / h);
-    const nx = Math.max(-0.02, Math.min(maxX, d.ox + dx / w)), ny = Math.max(-0.02, Math.min(maxY, d.oy + dy / h));
+    // the strip may hang off any edge of the mat, but never so far that it can't be picked up again
+    const lx = Math.min(d.ox, -(d.r0.width - KEEP_X) / w), hx = Math.max(d.ox, (w - KEEP_X) / w);
+    const ly = Math.min(d.oy, -(d.r0.height - KEEP_Y) / h), hy = Math.max(d.oy, (h - KEEP_Y) / h);
+    const nx = Math.max(lx, Math.min(hx, d.ox + dx / w)), ny = Math.max(ly, Math.min(hy, d.oy + dy / h));
     d.nx = nx; d.ny = ny;
     dx = (nx - d.ox) * w; dy = (ny - d.oy) * h;
     // paper lags behind the finger: tilt with horizontal velocity
@@ -324,30 +381,31 @@ export function TableView() {
     d.tilt += (Math.max(-8, Math.min(8, vx * 12)) - d.tilt) * 0.35;
     d.lx = e.clientX; d.lt = now;
     d.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) rotate(${d.rot + d.tilt}deg) scale(1.04)`;
-    // touching another strip's bottom or right edge offers a piece of masking tape
-    const L = d.r0.left + dx, T = d.r0.top + dy, R = L + d.r0.width;
-    let best: Drag['target'] = null, bestD = 22;
+    // touching another strip's edge — any of its four — offers a piece of tape
+    const L = d.r0.left + dx, T = d.r0.top + dy, R = L + d.r0.width, B = T + d.r0.height;
+    let best: Drag['target'] = null, bestD = 24;
     for (const o of d.others ?? []) {
-      const ox = Math.min(R, o.r.right) - Math.max(L, o.r.left);
-      const oy = Math.min(T + d.r0.height, o.r.bottom) - Math.max(T, o.r.top);
-      const ds = Math.abs(T - o.r.bottom);
-      if (ds < bestD && ox > Math.min(d.r0.width, o.r.width) * 0.3) { best = { id: o.id, el: o.el, how: 'stack' }; bestD = ds; }
-      const dj = Math.abs(L - o.r.right);
-      if (dj < bestD && oy > Math.min(d.r0.height, o.r.height) * 0.45) { best = { id: o.id, el: o.el, how: 'join' }; bestD = dj; }
+      const ovx = Math.min(R, o.r.right) - Math.max(L, o.r.left) > Math.min(d.r0.width, o.r.width) * 0.3;
+      const ovy = Math.min(B, o.r.bottom) - Math.max(T, o.r.top) > Math.min(d.r0.height, o.r.height) * 0.45;
+      const offer = (how: Side, dist: number, ok: boolean) => { if (ok && dist < bestD) { best = { id: o.id, el: o.el, how }; bestD = dist; } };
+      offer('stack', Math.abs(T - o.r.bottom), ovx);
+      offer('above', Math.abs(B - o.r.top), ovx);
+      offer('join', Math.abs(L - o.r.right), ovy);
+      offer('before', Math.abs(R - o.r.left), ovy);
     }
-    if (best?.id !== d.target?.id || best?.how !== d.target?.how) {
+    const bt = best as Drag['target'];
+    if (bt?.id !== d.target?.id || bt?.how !== d.target?.how) {
       clearTarget(d);
-      if (best) { best.el.classList.add(best.how === 'stack' ? 'tape-stack' : 'tape-join'); haptic('light'); }
-      d.target = best;
+      if (bt) { bt.el.classList.add('tape-' + bt.how); haptic('light'); }
+      d.target = bt;
     }
   };
   const cancelDrag = (e?: PointerEvent) => {
     const d = g.current;
     if (!d || (e && e.pointerId !== d.pid)) return;
     g.current = null;
-    clearTimeout(d.hold);
     clearTarget(d);
-    hideGuide();
+    endAim(d);
     active.value = null;
     d.el.style.transform = `rotate(${d.rot}deg)`;
   };
@@ -355,31 +413,33 @@ export function TableView() {
     const d = g.current;
     if (!d || e.pointerId !== d.pid) return;
     g.current = null;
-    clearTimeout(d.hold);
     if (d.aim) {
+      const cur = d.aim.cur;
       endAim(d);
-      const r = d.el.getBoundingClientRect(), cur = d.aim.cur;
-      const near = e.clientX > r.left - 48 && e.clientX < r.right + 48 && e.clientY > r.top - 48 && e.clientY < r.bottom + 48;
-      if (cur && near) doCut([{ id: d.id, cand: cur }]);
+      if (cur) doCut([{ id: d.id, cand: cur }]);
+      else { feel('click'); selected.value = null; } // a tap on the paper away from any cut puts the scissors down
       return;
     }
-    if (d.dead) return;
     if (d.moved) {
       const tgt = d.target;
       clearTarget(d);
       active.value = null;
-      const before = snapshot();
       if (tgt) {
+        const before = snapshot();
         d.el.style.transform = `rotate(${d.rot}deg)`;
         updateCurrent((song2) => {
           const a = song2.table.find((x) => x.id === tgt.id), b = song2.table.find((x) => x.id === d.id);
           if (!a || !b) return;
-          const t = tape(a, b, tgt.how);
+          // the strip that stays is the one you dropped onto; for top/front, the dropped one's words come first
+          const t = tgt.how === 'stack' || tgt.how === 'join' ? tape(a, b, tgt.how) : tape(b, a, tgt.how === 'above' ? 'stack' : 'join');
           a.text = t.text; a.joints = t.joints; a.from = 'splice'; a.z = topZ(song2.table);
+          if (tgt.how === 'above') { a.x = d.nx; a.y = d.ny; }
+          if (tgt.how === 'before') a.x = d.nx;
           song2.table = song2.table.filter((x) => x.id !== b.id);
         });
         feel('tape', 'medium');
-        undoable('table', tgt.how === 'stack' ? 'TAPED UNDERNEATH' : 'TAPED END TO END', () => restore(before));
+        const label = { stack: 'TAPED UNDERNEATH', join: 'TAPED END TO END', above: 'TAPED ON TOP', before: 'TAPED IN FRONT' }[tgt.how];
+        undoable('table', label, paperUndo(before));
         return;
       }
       // commit: set the final geometry on the element first so there is no visual jump, then update the store
@@ -390,13 +450,14 @@ export function TableView() {
         const t = song2.table.find((x) => x.id === d.id);
         if (t) { t.x = d.nx; t.y = d.ny; t.z = topZ(song2.table); }
       });
-      pushUndo('table', 'MOVE', () => restore(before));
       sound('thock');
       return;
     }
-    // a plain tap picks the strip up (no store write: it is only a highlight)
+    // a plain tap picks the strip up and gets the scissors out (no store write: it is only a highlight)
     feel('click');
-    selected.value = selected.value === s.id ? null : s.id;
+    const on = selected.value !== s.id;
+    selected.value = on ? s.id : null;
+    if (on && /\s/.test(s.text.trim())) hintOnce('table-scissors', 'SCISSORS OUT — TAP A DASHED LINE TO CUT THERE, OR PRESS AND SLIDE ALONG THE STRIP');
   };
 
   // ---- the mat: a stroke across it slices whatever it crosses · a double-tap writes a new slip · a tap clears the selection ----
@@ -470,12 +531,10 @@ export function TableView() {
   }, [sel, selStrip?.x]);
 
   return (
-    <div class={'mode-view table' + (cut ? ' cutting' : '')}>
-      <div class={'board' + (cut ? ' cutting' : '')} ref={board} onContextMenu={noMenu} onPointerDown={matDown as any} onPointerMove={matMove as any} onPointerUp={matUp as any} onPointerCancel={(e) => { if (sl.current && (e as any).pointerId !== sl.current.pid) return; sl.current = null; if (slashEl.current) slashEl.current.hidden = true; }}>
+    <div class="mode-view table">
+      <div class="board" ref={board} onContextMenu={noMenu} onPointerDown={matDown as any} onPointerMove={matMove as any} onPointerUp={matUp as any} onPointerCancel={(e) => { if (sl.current && (e as any).pointerId !== sl.current.pid) return; sl.current = null; if (slashEl.current) slashEl.current.hidden = true; }}>
         <div class="mat-rule" aria-hidden="true" />
         <div class="mat-label" aria-hidden="true">{song.title}</div>
-        <UndoChip surface="table" />
-        {cut && <div class="cut-banner" aria-hidden="true"><Icon n="scissors" size={12} stroke={2} /> PRESS A STRIP · SLIDE TO THE CUT · LET GO</div>}
         {strips.length === 0 && (
           <div class="empty-table">
             <b>AN EMPTY TABLE</b>
@@ -491,14 +550,13 @@ export function TableView() {
             top: selStrip.y > 0.12 ? `calc(${selStrip.y * 100}% - 48px)` : `calc(${selStrip.y * 100}% + 64px)`, zIndex: 1000,
           }}>
             <button onClick={() => { sheetState.value = { kind: 'edit', id: selStrip.id }; }}><Icon n="edit" size={14} />EDIT</button>
-            <button onClick={() => { selected.value = null; cutting.value = true; feel('snip', 'light'); say('SCISSORS — PRESS A STRIP, SLIDE TO THE CUT, LET GO'); }}><Icon n="scissors" size={14} />SNIP</button>
             <button class="go" onClick={() => { sheetState.value = { kind: 'bench', id: selStrip.id }; }}><Icon n="bench" size={14} />BENCH</button>
             <button aria-label="More" onClick={() => { sheetState.value = { kind: 'more', id: selStrip.id }; }}><Icon n="dots" size={16} /></button>
             <button class="danger" aria-label="Throw away" onClick={() => {
               const before = snapshot();
               updateCurrent((d) => { d.table = d.table.filter((x) => x.id !== selStrip.id); });
               selected.value = null;
-              undoable('table', 'STRIP THROWN AWAY', () => restore(before));
+              undoable('table', 'STRIP THROWN AWAY', paperUndo(before));
             }}><Icon n="trash" size={14} /></button>
           </div>
         )}
@@ -511,8 +569,8 @@ export function TableView() {
             const t = v.trim();
             if (!t) return;
             const before = snapshot();
-            updateCurrent((d) => { d.table.push({ id: uid(), text: t, x: sheet.x, y: sheet.y, rot: (Math.random() - 0.5) * 4, z: topZ(d.table), from: 'typed' }); });
-            pushUndo('table', 'NEW SLIP', () => restore(before));
+            updateCurrent((d) => { d.table.push({ id: uid(), text: t, x: fitX(t, sheet.x), y: sheet.y, rot: (Math.random() - 0.5) * 4, z: topZ(d.table), from: 'typed' }); });
+            pushUndo('table', 'NEW SLIP', paperUndo(before));
             feel('thock');
           }} />
       )}
@@ -527,7 +585,7 @@ export function TableView() {
               if (!t || !v.trim() || v.trim() === t.text) return;
               t.text = v.trim(); t.joints = []; t.from = 'typed'; changed = true;
             });
-            if (changed) pushUndo('table', 'EDIT', () => restore(before));
+            if (changed) pushUndo('table', 'EDIT', paperUndo(before));
           }} />
       )}
       {sheet?.kind === 'bench' && <BenchChooser id={sheet.id} />}
@@ -545,7 +603,11 @@ function MoreSheet({ id }: { id: ID }) {
   if (!strip) return null;
   const multi = strip.text.includes('\n');
   const words = strip.text.split(/\s+/).filter(Boolean);
-  const done = (label: string, before: Strip[], extra?: () => void) => { selected.value = null; close(); undoable('table', label, () => { restore(before); extra?.(); }); };
+  const done = (label: string, before: Strip[], extra?: () => void) => {
+    const back = paperUndo(before);
+    selected.value = null; close();
+    undoable('table', label, () => { back(); extra?.(); });
+  };
   return (
     <Sheet title="THIS STRIP" onClose={close}>
       <div class="choices">
@@ -563,7 +625,7 @@ function MoreSheet({ id }: { id: ID }) {
             let z = topZ(d.table);
             const fresh: Strip[] = [];
             words.forEach((w, k) => {
-              const p = k === 0 ? { x: t.x, y: t.y } : freeSpot([...out, ...fresh]);
+              const p = k === 0 ? { x: t.x, y: t.y } : freeSpot([...out, ...fresh], Math.random, w);
               fresh.push({ id: uid(), text: w, from: 'cut', x: p.x, y: p.y, rot: (Math.random() - 0.5) * 8, z: z++ });
             });
             land(fresh);
@@ -620,7 +682,8 @@ function BenchChooser({ id }: { id: ID }) {
     const nm = sectionNames(currentSong.peek()!).get(sid) ?? (kind ?? 'verse').toUpperCase();
     say(`→ ${nm}`, { label: 'GO', run: () => setMode('bench') });
     // undo puts the strip back and takes exactly those lines off the bench again — anything written there since stays
-    pushUndo('table', 'SENT TO THE BENCH', () => { restore(before); sent.undo(); });
+    const back = paperUndo(before);
+    pushUndo('table', 'SENT TO THE BENCH', () => { back(); sent.undo(); });
   };
   return (
     <Sheet title="SLOT INTO THE BENCH" onClose={close}>
@@ -667,12 +730,6 @@ export function TableKeys() {
         const got = deal(4);
         say(got ? `DEALT ${got} FROM THE SHOEBOX` : 'THE SHOEBOX IS EMPTY — CATCH SOME LINES FIRST');
       }} />
-      <Key icon="scissors" label="Snip" led on={cutting.value} sound="snip" disabled={!n && !cutting.value}
-        onClick={() => {
-          cutting.value = !cutting.value;
-          selected.value = null;
-          say(cutting.value ? 'SCISSORS — PRESS A STRIP, SLIDE TO THE CUT, LET GO' : 'SCISSORS PUT DOWN', undefined, 3000);
-        }} />
       <Key icon="cutup" label="Cut-up" sound="snip" disabled={!n} onClick={() => {
         const before = snapshot();
         let cuts = 0, pieces = 0;
@@ -684,7 +741,7 @@ export function TableKeys() {
             if (frags.length < 2) { out.push(s); continue; }
             cuts++;
             frags.forEach((f, k) => {
-              const p = freeSpot(out);
+              const p = freeSpot(out, Math.random, f);
               out.push({ id: uid(), text: f, from: 'cut', x: k === 0 ? s.x : p.x, y: k === 0 ? s.y : p.y, rot: (Math.random() - 0.5) * 8, z: z++ });
               pieces++;
             });
@@ -694,16 +751,18 @@ export function TableKeys() {
         });
         if (!cuts) { say('NOTHING LONG ENOUGH TO CUT UP'); return; }
         feel('snip', 'medium');
-        undoable('table', `CUT ${cuts} INTO ${pieces} — NOW REARRANGE`, () => restore(before), undefined, 'CUT-UP');
+        undoable('table', `CUT ${cuts} INTO ${pieces} — NOW REARRANGE`, paperUndo(before), undefined, 'CUT-UP');
       }} />
       <Key icon="shuffle" label="Shuffle" sound="shuffle" disabled={n < 2} onClick={() => {
         const before = snapshot();
         glide(() => updateCurrent((d) => {
           const out: Strip[] = [];
-          for (const s of [...d.table].sort(() => Math.random() - 0.5)) { const p = freeSpot(out); out.push({ ...s, x: p.x, y: p.y, rot: (Math.random() - 0.5) * 6 }); }
+          for (const s of [...d.table].sort(() => Math.random() - 0.5)) { const p = freeSpot(out, Math.random, s.text); out.push({ ...s, x: p.x, y: p.y, rot: (Math.random() - 0.5) * 6 }); }
           d.table = out;
         }));
-        pushUndo('table', 'SHUFFLE', () => glide(() => restore(before)));
+        // a shuffle throws away an arrangement you can't rebuild by hand, so it is the one move that can be undone
+        const back = paperUndo(before, { place: true });
+        pushUndo('table', 'SHUFFLE', () => glide(back));
       }} />
       <Key icon="sweep" label="Sweep" sound="shuffle" disabled={!n} onClick={() => {
         const before = snapshot();
@@ -712,8 +771,10 @@ export function TableKeys() {
         const filed = keep.map((s) => addScrap(s.text.replace(/\n/g, ' / '), 'table', currentSong.peek()?.id)).filter(Boolean);
         updateCurrent((d) => { d.table = []; });
         selected.value = null;
-        undoable('table', filed.length ? `TABLE CLEARED · ${filed.length} KEPT IN THE SHOEBOX` : 'TABLE CLEARED', () => { restore(before); filed.forEach((f) => f && removeScrap(f.id)); }, undefined, 'SWEEP');
+        const back = paperUndo(before);
+        undoable('table', filed.length ? `TABLE CLEARED · ${filed.length} KEPT IN THE SHOEBOX` : 'TABLE CLEARED', () => { back(); filed.forEach((f) => f && removeScrap(f.id)); }, undefined, 'SWEEP');
       }} />
+      <Key icon="undo" label="Undo" sound="click" disabled={!undoDepth('table')} onClick={() => { selected.value = null; runUndo('table'); }} />
     </Keys>
   );
 }

@@ -1,7 +1,7 @@
 import { signal } from '@preact/signals';
 import { ID } from '../../store/models';
 import { currentSong } from '../../store/state';
-import { placeChord, recordTake, removeChord, snapToWord } from '../../store/lines';
+import { placeChord, removeChord, snapToWord } from '../../store/lines';
 import { runUndo } from '../../store/undo';
 import { indexAtPoint } from '../../engine/hit';
 import { feel, haptic } from '../../engine/feel';
@@ -44,9 +44,7 @@ export function startChordDrag(e: PointerEvent, name: string, origin: Origin | n
       if (line) {
         const at = charAt(lineEl, ev.clientX, ev.clientY, line.text);
         if (origin) {
-          // moving a stamp is one undo step: snapshot both ends first
-          recordTake(origin.songId, origin.sid, 'MOVED CHORD');
-          if (origin.sid !== sid) recordTake(song.id, sid, 'MOVED CHORD');
+          // moving a stamp is not an undo step (it is as easy to slide it back)
           removeChord(origin.songId, origin.sid, origin.lid, origin.at, false);
           placeChord(song.id, sid, lid, at, name, false);
         } else placeChord(song.id, sid, lid, at, name);

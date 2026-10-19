@@ -182,10 +182,11 @@ ok('strips drag', Math.abs(b0b.y - b0.y) > 90, `dy ${Math.round(b0b.y - b0.y)}`)
   const gp = await grabPoint(sB);
   await page.mouse.click(gp.x, gp.y); await wait(250);
   await page.mouse.move(gp.x, gp.y); await page.mouse.down();
-  await page.mouse.move(gp.x + 40, gp.y + 70, { steps: 6 }); await wait(150);
+  // a picked-up strip has its scissors out: pulled off its own paper, it comes along instead
+  await page.mouse.move(gp.x + 40, gp.y + 150, { steps: 8 }); await wait(150);
   const lifted = await sB.evaluate((el) => el.classList.contains('dragging'));
   await page.mouse.up(); await wait(300);
-  ok('a selected strip keeps its lifted look while it is dragged', lifted);
+  ok('a picked-up strip pulled off its paper is dragged, lifted all the way', lifted);
 }
 // select + snip at a gap
 const longId = await page.locator('.strip').filter({ has: page.locator('.gap') }).first().getAttribute('data-id');
@@ -200,27 +201,30 @@ await wait(200);
 const gap = longStrip.locator('.gap').first();
 const gb = await gap.boundingBox();
 const nBeforeSnip = await page.locator('.strip').count();
-// hold a strip and the scissors come out: a guide shows exactly where the cut falls; let go to cut
-await page.mouse.move(gb.x + gb.width / 2 + 6, gb.y + gb.height / 2); await page.mouse.down();
-await wait(520);
-ok('holding a strip brings out the scissors and a cut guide', (await page.locator('.cutguide:not([hidden])').count()) === 1);
+// tap a strip: its scissors come out (dashed lines at every cut); tap a dashed line to cut there — no tool to pick up
+await page.mouse.click(lgp.x, lgp.y); await wait(200);
+ok('a picked-up strip shows where it can be cut', await longStrip.evaluate((el) => el.classList.contains('sel')));
+await page.mouse.move(gb.x + gb.width / 2 + 3, gb.y + gb.height / 2); await page.mouse.down();
+await wait(120);
+ok('pressing near a cut shows exactly where it will fall', (await page.locator('.cutguide:not([hidden])').count()) === 1);
 await shot('21-table-aim');
 await page.mouse.up();
 await wait(350);
-ok('letting go cuts at the guide', (await page.locator('.strip').count()) === nBeforeSnip + 1);
-ok('the table offers UNDO', (await page.locator('.undo-chip').count()) === 1);
-await page.click('.undo-chip');
+ok('letting go cuts there', (await page.locator('.strip').count()) === nBeforeSnip + 1);
+ok('the UNDO key wakes up', !(await page.locator('.bezel-bottom button[aria-label="Undo"]').isDisabled()));
+await key('Undo');
 await wait(350);
 ok('UNDO glues it back', (await page.locator('.strip').count()) === nBeforeSnip);
-// the scissors tool: press anywhere on a strip, it cuts at the nearest gap
-await key('Snip');
-await wait(200);
-ok('SNIP lights up the scissors mode', (await page.locator('.board.cutting').count()) === 1);
-const lsb2 = await longStrip.boundingBox();
-await page.mouse.move(lsb2.x + lsb2.width * 0.5, lsb2.y + lsb2.height / 2); await page.mouse.down(); await wait(80); await page.mouse.up();
-await wait(350);
-ok('a plain press cuts at the nearest gap', (await page.locator('.strip').count()) === nBeforeSnip + 1);
-await key('Snip');
+// press anywhere on a picked-up strip and slide: the cut follows the finger; let go to cut
+{
+  const lsb2 = await longStrip.boundingBox();
+  const p2 = await grabPoint(longStrip);
+  await page.mouse.click(p2.x, p2.y); await wait(200);
+  await page.mouse.move(p2.x, p2.y); await page.mouse.down();
+  await page.mouse.move(Math.min(lsb2.x + lsb2.width - 10, p2.x + 60), p2.y, { steps: 5 }); await wait(80);
+  await page.mouse.up(); await wait(350);
+  ok('press, slide along the strip, let go: it cuts', (await page.locator('.strip').count()) === nBeforeSnip + 1);
+}
 // slash across the mat through a strip (start and end on bare mat, so nothing is picked up by accident)
 const slash = await page.evaluate(() => {
   const board = document.querySelector('.board');
@@ -246,14 +250,15 @@ await shot('21-table-snip');
 // the rare strip actions live behind "more"; one UNDO puts everything back
 {
   const target = page.locator('.strip:has(.gap)').first();
-  const bx = await target.boundingBox();
+  const tp = await grabPoint(target);
   const before = await page.locator('.strip').count();
-  await page.mouse.click(bx.x + 6, bx.y + 6); await wait(250);
+  await page.mouse.click(tp.x, tp.y); await wait(250);
+  if (!(await page.locator('.strip-actions').count())) { await page.mouse.click(tp.x, tp.y); await wait(250); } // it was already picked up: that tap put it down
   await page.locator('.strip-actions button[aria-label="More"]').click();
   await page.locator('.sheet .choice:has-text("SPLIT INTO WORDS")').click();
   await wait(500);
   ok('SPLIT INTO WORDS gives every word its own slip', (await page.locator('.strip').count()) > before, `${before} -> ${await page.locator('.strip').count()}`);
-  await page.click('.undo-chip'); await wait(400);
+  await key('Undo'); await wait(400);
   ok('UNDO glues the words back', (await page.locator('.strip').count()) === before);
 }
 // tape: drop a strip right under another one
@@ -289,7 +294,7 @@ const grip = picks.grip;
 await drag(grip.x, grip.y, ab.x + 4 + grip.dx, ab.y + ab.height + grip.dy, 16);
 await wait(300);
 ok('dropping on an edge tapes the strips together', (await all.count()) === nBeforeTape - 1, `${nBeforeTape} -> ${await all.count()}`);
-ok('the joint shows masking tape', (await page.locator('.strip .hseam.taped').count()) >= 1);
+ok('the joint shows a bit of clear tape', (await page.locator('.strip .hseam.taped').count()) >= 1);
 await shot('22-table-taped');
 // cut-up + undo from the LCD
 const nBeforeCut = await all.count();

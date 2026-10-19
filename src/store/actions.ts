@@ -25,10 +25,19 @@ export function tidyPhrase(s: string): string {
 }
 
 /** Pick a roomy spot on the board for a new strip. */
-export function freeSpot(existing: Strip[], rnd = Math.random): { x: number; y: number } {
+/** Roughly how much of the mat's width a strip of this text takes (it wraps at 74%). */
+export function stripWidth(text: string, matPx = typeof window !== 'undefined' ? Math.min(window.innerWidth, 720) - 24 : 366): number {
+  const longest = Math.max(...text.split('\n').map((l) => l.length), 1);
+  return Math.min(0.74, (longest * 9.1 + 28) / matPx);
+}
+/** Move x left just enough that a strip of this text lands wholly on the mat. */
+export const fitX = (text: string, x: number): number => Math.max(0.02, Math.min(x, 0.98 - stripWidth(text)));
+
+export function freeSpot(existing: Strip[], rnd = Math.random, text?: string): { x: number; y: number } {
   let best = { x: 0.06, y: 0.05 }, bestD = -1;
+  const maxX = text === undefined ? 0.46 : Math.max(0.04, 0.96 - stripWidth(text)) - 0.04;
   for (let i = 0; i < 28; i++) {
-    const x = 0.04 + rnd() * 0.42, y = 0.03 + rnd() * 0.8;
+    const x = 0.04 + rnd() * maxX, y = 0.03 + rnd() * 0.8;
     let d = 9;
     for (const s of existing) d = Math.min(d, Math.hypot((s.x - x) * 1.1, (s.y - y) * 2.2));
     if (d > bestD) { bestD = d; best = { x, y }; }
@@ -40,7 +49,7 @@ export function makeStrips(texts: string[], from: Strip['from'], existing: Strip
   const out: Strip[] = [];
   let z = Math.max(0, ...existing.map((s) => s.z));
   for (const t of texts) {
-    const pos = freeSpot([...existing, ...out]);
+    const pos = freeSpot([...existing, ...out], Math.random, t);
     out.push({ id: uid(), text: t, x: pos.x, y: pos.y, rot: (Math.random() - 0.5) * 5, z: ++z, from });
   }
   return out;

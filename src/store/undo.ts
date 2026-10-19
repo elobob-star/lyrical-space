@@ -1,5 +1,5 @@
 // A small LIFO undo stack per song and surface (Table, Bench). The LCD offers UNDO right after an action, and the
-// UNDO chip on the surface itself keeps working for as long as there is something to take back.
+// UNDO key / arrow on the surface itself keeps working for as long as there is something to take back.
 import { signal } from '@preact/signals';
 import { ID } from './models';
 import { currentId } from './state';

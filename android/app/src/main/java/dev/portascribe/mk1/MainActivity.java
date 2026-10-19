@@ -10,6 +10,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // the writer's own folder: everything is mirrored there so it outlives the app
+        registerPlugin(FolderPlugin.class);
         super.onCreate(savedInstanceState);
         requestHighestRefreshRate();
     }
