@@ -3,6 +3,10 @@
 The notebook-first successor to Portascribe MK-I (it installs as its own app, `dev.foolscap.app`, so both can sit side by side; use SAVE A COPY → OPEN A COPY to carry writing across, either way). A lyric notepad that behaves like a piece of studio hardware — a matte, Teenage-Engineering-style machine
 wrapped around warm, imperfect paper. Built to beat perfectionism, not to write for you.
 
+<p align="center">
+  <img src="docs/screenshots/hero.png" alt="Foolscap on a phone: the notebook with a struck-out word, the table with paper strips and a cut, the bench with chords, and the tapes rack" width="900">
+</p>
+
 | Dial | Surface | Keys | Borrowed from |
 |---|---|---|---|
 | **NOTEBOOK** | a yellow legal pad of dated pages that belongs to no song — the app opens here | LATCH · PEN · DRAW · PUNCH · SPRINT | Dylan / Waits: just ramble. A fresh page after a break, old pages a flip back. The word you're typing erases; once you hit space, backspace strikes it through. UNDO when you want it. LATCH = forward only. PEN taps the gems, PUNCH files them into the shoebox. |
@@ -12,6 +16,10 @@ wrapped around warm, imperfect paper. Built to beat perfectionism, not to write 
 **⏏ TAPES** opens the rack: cassette J-cards, the **Shoebox** (one pile for every stray line), the bin, tape history,
 **PASTE IN** (plain lyrics, chords-over-lyrics or ChordPro). **SETUP** is the gear at the end of the LCD — one tap from anywhere. The **CATCH** slip on the right edge files a
 line into the shoebox while you're working on a song. The **LCD** is the machine's only voice — tap it to UNDO or follow a hint.
+
+<p align="center">
+  <img src="docs/screenshots/setup.png" alt="Setup: the library folder, then the look (finish, paper, type size)" width="260">
+</p>
 
 **Your words outlive the app**: Setup › LIBRARY › CHOOSE A FOLDER keeps everything in a folder you pick, as plain files
 (the format is [`docs/FORMAT.md`](docs/FORMAT.md)). Delete the app, install it again — or any later version — choose the
@@ -43,6 +51,7 @@ node scripts/e2e/flows.mjs out/     # ~90 interactions across every surface
 node scripts/e2e/undo.mjs out/      # undo everywhere, the page menu, the LCD gear
 URL=http://127.0.0.1:4173/ node scripts/e2e/upgrade.mjs   # an older install's data opened by this build (vite preview)
 node scripts/e2e/tour.mjs out/      # screenshots of every surface
+node scripts/e2e/readme-shots.mjs docs/screenshots   # the README pictures (sample lyrics only), incl. the hero
 node scripts/e2e/sheets.mjs out/    # screenshots of every sheet, light and dark
 ```
 
